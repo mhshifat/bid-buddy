@@ -34,6 +34,42 @@ const createScopeSchema = z.object({
   notes: z.string().nullable().default(null),
 });
 
+const createFromEstimateSchema = z.object({
+  jobId: z.string().min(1),
+  jobTitle: z.string().min(1),
+  jobDescription: z.string().default(""),
+  /** AI-generated scope data from the Scope Estimator panel */
+  estimate: z.object({
+    tasks: z.array(z.object({
+      name: z.string(),
+      description: z.string(),
+      category: z.string(),
+      hoursMin: z.number(),
+      hoursMax: z.number(),
+      complexity: z.string(),
+      deliverable: z.string(),
+    })),
+    milestones: z.array(z.object({
+      name: z.string(),
+      tasks: z.array(z.string()),
+      hoursEstimate: z.number(),
+      suggestedPaymentPercent: z.number(),
+      deliverables: z.array(z.string()),
+    })),
+    totalHoursMin: z.number(),
+    totalHoursMax: z.number(),
+    adjustedHoursMin: z.number(),
+    adjustedHoursMax: z.number(),
+    riskBufferPercent: z.number(),
+    suggestedFixedPrice: z.number().nullable(),
+    suggestedHourlyRate: z.number().nullable(),
+    scopeRisks: z.array(z.string()),
+    assumptions: z.array(z.string()),
+    outOfScopeItems: z.array(z.string()),
+    summary: z.string(),
+  }),
+});
+
 const updateScopeSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1).optional(),
@@ -111,6 +147,83 @@ export const scopeRouter = createRouter({
       });
 
       logger.info(`Scope created: ${scope.id} for project "${input.title}"`);
+      return scope;
+    }),
+
+  /**
+   * Auto-create a scope from the AI Scope Estimator output.
+   * Maps tasks → deliverables, outOfScopeItems → exclusions, milestones → milestone names,
+   * and fills budget/timeline from the AI's recommendations.
+   */
+  createFromEstimate: publicProcedure
+    .input(createFromEstimateSchema)
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = await resolveTenantId(ctx);
+      const { estimate, jobId, jobTitle, jobDescription } = input;
+
+      // Map task deliverables into a unique list
+      const deliverables = [
+        ...new Set(estimate.tasks.map((t) => t.deliverable).filter(Boolean)),
+      ];
+
+      // If no task-level deliverables, use milestone deliverables
+      if (deliverables.length === 0) {
+        estimate.milestones.forEach((ms) => {
+          ms.deliverables.forEach((d) => {
+            if (!deliverables.includes(d)) deliverables.push(d);
+          });
+        });
+      }
+
+      // Build milestone labels with payment % and hours
+      const milestones = estimate.milestones.map(
+        (ms) => `${ms.name} (~${ms.hoursEstimate}h, ${ms.suggestedPaymentPercent}% payment)`
+      );
+
+      // Compute budget: prefer fixed price, else hourly × adjusted hours
+      let agreedBudget: number | null = estimate.suggestedFixedPrice;
+      if (!agreedBudget && estimate.suggestedHourlyRate) {
+        agreedBudget = estimate.suggestedHourlyRate * estimate.adjustedHoursMax;
+      }
+
+      // Compute timeline from adjusted hours (assume 8h/day, 5d/week)
+      const weeksMin = Math.ceil(estimate.adjustedHoursMin / 40);
+      const weeksMax = Math.ceil(estimate.adjustedHoursMax / 40);
+      const agreedTimeline =
+        weeksMin === weeksMax
+          ? `${weeksMax} week${weeksMax > 1 ? "s" : ""}`
+          : `${weeksMin}–${weeksMax} weeks`;
+
+      // Build description from summary + assumptions
+      const descParts = [estimate.summary];
+      if (estimate.assumptions.length > 0) {
+        descParts.push(
+          "\n\nAssumptions:\n" + estimate.assumptions.map((a) => `• ${a}`).join("\n")
+        );
+      }
+      if (estimate.scopeRisks.length > 0) {
+        descParts.push(
+          "\n\nRisks:\n" + estimate.scopeRisks.map((r) => `• ${r}`).join("\n")
+        );
+      }
+
+      const scope = await ctx.prisma.projectScope.create({
+        data: {
+          tenant_id: tenantId,
+          job_id: jobId,
+          title: jobTitle,
+          original_description: jobDescription || descParts.join(""),
+          deliverables,
+          exclusions: estimate.outOfScopeItems,
+          milestones,
+          agreed_budget: agreedBudget,
+          agreed_timeline: agreedTimeline,
+          revision_limit: null,
+          notes: descParts.join(""),
+        },
+      });
+
+      logger.info(`Scope auto-created from AI estimate: ${scope.id} for job ${jobId}`);
       return scope;
     }),
 

@@ -36,10 +36,14 @@ import {
   Info,
   Copy,
   Check,
+  ShieldPlus,
+  Zap,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
 import { toast } from "sonner";
+import { DefineScopeDialog } from "@/components/modules/scope-shield/define-scope-dialog";
+import type { ScopeInitialData } from "@/components/modules/scope-shield/define-scope-dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,6 +86,8 @@ interface ScopeData {
 
 interface ScopeEstimatorPanelProps {
   jobId: string;
+  jobTitle?: string;
+  jobDescription?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,9 +114,22 @@ const complexityColors: Record<string, string> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ScopeEstimatorPanel({ jobId }: ScopeEstimatorPanelProps) {
+export function ScopeEstimatorPanel({ jobId, jobTitle, jobDescription }: ScopeEstimatorPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScopeData | null>(null);
+  const [scopeProtected, setScopeProtected] = useState(false);
+
+  // Check if a scope already exists for this job
+  const { data: existingScopes } = trpc.scope.list.useQuery(undefined, {
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (existingScopes?.some((s) => s.job_id === jobId)) {
+      setScopeProtected(true);
+    }
+  }, [existingScopes, jobId]);
 
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
@@ -123,6 +142,78 @@ export function ScopeEstimatorPanel({ jobId }: ScopeEstimatorPanelProps) {
       setResult(cached.result as ScopeData);
     }
   }, [cached, result]);
+
+  // Quick-protect: auto-create scope from AI estimate in one click
+  const quickProtectMutation = trpc.scope.createFromEstimate.useMutation({
+    onSuccess: () => {
+      setScopeProtected(true);
+      toast.success("Scope Shield activated!", {
+        description: "Project scope auto-created from AI estimate. Go to Scope Shield to manage it.",
+      });
+    },
+    onError: () => {
+      toast.error("Failed to create scope", {
+        description: "Try using the manual 'Define Scope' dialog instead.",
+      });
+    },
+  });
+
+  /** Convert AI estimate result → DefineScopeDialog initialData */
+  function buildInitialData(): ScopeInitialData | undefined {
+    if (!result) return undefined;
+
+    const deliverables = [
+      ...new Set(result.tasks.map((t) => t.deliverable).filter(Boolean)),
+    ];
+    if (deliverables.length === 0) {
+      result.milestones.forEach((ms) =>
+        ms.deliverables.forEach((d) => {
+          if (!deliverables.includes(d)) deliverables.push(d);
+        })
+      );
+    }
+
+    const milestones = result.milestones.map(
+      (ms) => `${ms.name} (~${ms.hoursEstimate}h, ${ms.suggestedPaymentPercent}% payment)`
+    );
+
+    let budget: number | null = result.suggestedFixedPrice;
+    if (!budget && result.suggestedHourlyRate) {
+      budget = result.suggestedHourlyRate * result.adjustedHoursMax;
+    }
+
+    const weeksMin = Math.ceil(result.adjustedHoursMin / 40);
+    const weeksMax = Math.ceil(result.adjustedHoursMax / 40);
+    const timeline =
+      weeksMin === weeksMax
+        ? `${weeksMax} week${weeksMax > 1 ? "s" : ""}`
+        : `${weeksMin}–${weeksMax} weeks`;
+
+    const descParts = [result.summary];
+    if (result.assumptions.length > 0) {
+      descParts.push("\n\nAssumptions:\n" + result.assumptions.map((a) => `• ${a}`).join("\n"));
+    }
+
+    return {
+      title: jobTitle ?? "Untitled Project",
+      description: descParts.join(""),
+      deliverables,
+      exclusions: result.outOfScopeItems,
+      milestones,
+      budget,
+      timeline,
+    };
+  }
+
+  function handleQuickProtect() {
+    if (!result) return;
+    quickProtectMutation.mutate({
+      jobId,
+      jobTitle: jobTitle ?? "Untitled Project",
+      jobDescription: jobDescription ?? "",
+      estimate: result,
+    });
+  }
 
   const mutation = trpc.ai.scopeEstimate.useMutation({
     onSuccess: (data) => {
@@ -196,6 +287,68 @@ export function ScopeEstimatorPanel({ jobId }: ScopeEstimatorPanelProps) {
           Re-estimate
         </Button>
       </div>
+
+      {/* Scope Shield Integration */}
+      {!scopeProtected ? (
+        <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-emerald-100 p-2 dark:bg-emerald-900">
+                <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Protect this scope</p>
+                <p className="text-xs text-muted-foreground">
+                  Activate Scope Shield to detect scope creep and generate change orders
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <DefineScopeDialog
+                jobId={jobId}
+                initialData={buildInitialData()}
+                onCreated={() => setScopeProtected(true)}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <ShieldPlus className="mr-1.5 h-3.5 w-3.5" />
+                    Customize & Protect
+                  </Button>
+                }
+              />
+              <Button
+                size="sm"
+                onClick={handleQuickProtect}
+                disabled={quickProtectMutation.isPending}
+              >
+                {quickProtectMutation.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Zap className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Quick Protect
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/50">
+          <CardContent className="flex items-center gap-3 p-4">
+            <Check className="h-5 w-5 text-emerald-600" />
+            <div>
+              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                Scope Shield Active
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Visit{" "}
+                <a href="/scope-shield" className="underline hover:text-primary">
+                  Scope Shield
+                </a>{" "}
+                to detect scope creep and manage change requests.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary */}
       <Card className="border-primary/20">

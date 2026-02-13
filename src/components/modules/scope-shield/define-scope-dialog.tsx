@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,13 +22,41 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, X, ShieldPlus } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 
+/** Optional pre-populated data (e.g. from AI Scope Estimator) */
+export interface ScopeInitialData {
+  title?: string;
+  description?: string;
+  deliverables?: string[];
+  exclusions?: string[];
+  milestones?: string[];
+  budget?: number | null;
+  timeline?: string | null;
+  revisionLimit?: number | null;
+}
+
 interface DefineScopeDialogProps {
   jobId?: string;
   projectId?: string;
   onCreated?: () => void;
+  /** If provided, the dialog opens pre-filled with AI-generated data */
+  initialData?: ScopeInitialData;
+  /** When true, the dialog opens immediately (controlled externally) */
+  externalOpen?: boolean;
+  /** Callback when dialog open state changes */
+  onOpenChange?: (open: boolean) => void;
+  /** Custom trigger element; if omitted, uses default button */
+  trigger?: React.ReactNode;
 }
 
-export function DefineScopeDialog({ jobId, projectId, onCreated }: DefineScopeDialogProps) {
+export function DefineScopeDialog({
+  jobId,
+  projectId,
+  onCreated,
+  initialData,
+  externalOpen,
+  onOpenChange,
+  trigger,
+}: DefineScopeDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -39,6 +67,24 @@ export function DefineScopeDialog({ jobId, projectId, onCreated }: DefineScopeDi
   const [budget, setBudget] = useState("");
   const [timeline, setTimeline] = useState("");
   const [revisionLimit, setRevisionLimit] = useState("");
+
+  // Sync external open state
+  useEffect(() => {
+    if (externalOpen !== undefined) setOpen(externalOpen);
+  }, [externalOpen]);
+
+  // Pre-populate from initialData when dialog opens
+  useEffect(() => {
+    if (open && initialData) {
+      if (initialData.title) setTitle(initialData.title);
+      if (initialData.description) setDescription(initialData.description);
+      if (initialData.deliverables?.length) setDeliverables(initialData.deliverables);
+      if (initialData.exclusions?.length) setExclusions(initialData.exclusions);
+      if (initialData.budget) setBudget(String(initialData.budget));
+      if (initialData.timeline) setTimeline(initialData.timeline);
+      if (initialData.revisionLimit) setRevisionLimit(String(initialData.revisionLimit));
+    }
+  }, [open, initialData]);
 
   const createMutation = trpc.scope.create.useMutation({
     onSuccess: () => {
@@ -84,20 +130,30 @@ export function DefineScopeDialog({ jobId, projectId, onCreated }: DefineScopeDi
       originalDescription: description,
       deliverables,
       exclusions,
+      milestones: initialData?.milestones ?? [],
       agreedBudget: budget ? parseFloat(budget) : null,
       agreedTimeline: timeline || null,
       revisionLimit: revisionLimit ? parseInt(revisionLimit, 10) : null,
     });
   }
 
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    onOpenChange?.(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <ShieldPlus className="mr-2 h-4 w-4" />
-          Define Scope
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {trigger !== undefined ? (
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
+      ) : (
+        <DialogTrigger asChild>
+          <Button>
+            <ShieldPlus className="mr-2 h-4 w-4" />
+            Define Scope
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Define Project Scope</DialogTitle>

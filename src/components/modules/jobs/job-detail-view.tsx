@@ -336,7 +336,11 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
 
             {/* Scope Estimator Tab */}
             <TabsContent value="scope" className="mt-4">
-              <ScopeEstimatorPanel jobId={jobId} />
+              <ScopeEstimatorPanel
+                jobId={jobId}
+                jobTitle={job?.title}
+                jobDescription={job?.description}
+              />
             </TabsContent>
 
             {/* Discovery Questions Tab */}
