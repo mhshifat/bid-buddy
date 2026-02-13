@@ -6,6 +6,44 @@ import { z } from "zod";
 import type { Job, AiAnalysis, Proposal, JobTag, JobNote } from "@prisma/client";
 import { createRouter, publicProcedure } from "../trpc";
 import { eventBus } from "@/server/events";
+import { logger } from "@/server/lib/logger";
+import type { TrpcContext } from "../trpc";
+
+// ============================================================================
+// Default Tenant Helper
+// ============================================================================
+
+const DEFAULT_TENANT_SLUG = "default";
+
+/**
+ * Returns a valid tenant ID for the current request.
+ * Priority: authenticated user's tenant → default tenant (auto-created).
+ */
+async function resolveTenantId(ctx: TrpcContext): Promise<string> {
+  // 1. Use authenticated tenant if available
+  if (ctx.tenantId) {
+    return ctx.tenantId;
+  }
+
+  // 2. Find or create the default tenant
+  let tenant = await ctx.prisma.tenant.findUnique({
+    where: { slug: DEFAULT_TENANT_SLUG },
+    select: { id: true },
+  });
+
+  if (!tenant) {
+    logger.info("Creating default tenant for first-time setup");
+    tenant = await ctx.prisma.tenant.create({
+      data: {
+        name: "My Workspace",
+        slug: DEFAULT_TENANT_SLUG,
+      },
+      select: { id: true },
+    });
+  }
+
+  return tenant.id;
+}
 
 const jobFilterSchema = z.object({
   page: z.number().min(1).default(1),
@@ -90,8 +128,9 @@ export const jobRouter = createRouter({
     // Build where clause dynamically
     const where: Record<string, unknown> = {};
 
-    // TODO: Replace with actual tenant from auth context
-    // where.tenant_id = ctx.tenantId;
+    // Scope to the user's tenant (or default tenant)
+    const tenantId = await resolveTenantId(ctx);
+    where.tenant_id = tenantId;
 
     if (input.status) {
       where.status = input.status;
@@ -307,8 +346,25 @@ export const jobRouter = createRouter({
   create: publicProcedure
     .input(createJobSchema)
     .mutation(async ({ ctx, input }) => {
-      // TODO: Replace with actual tenant from auth context
-      const tenantId = "placeholder-tenant";
+      const tenantId = await resolveTenantId(ctx);
+
+      // Upsert: skip if this Upwork job was already captured for this tenant
+      const existing = await ctx.prisma.job.findUnique({
+        where: {
+          tenant_id_upwork_job_id: {
+            tenant_id: tenantId,
+            upwork_job_id: input.upworkJobId,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        logger.info(`Job already captured: ${input.upworkJobId}`, {
+          correlationId: ctx.correlationId,
+        });
+        return { id: existing.id, alreadyExists: true };
+      }
 
       const job = await ctx.prisma.job.create({
         data: {
