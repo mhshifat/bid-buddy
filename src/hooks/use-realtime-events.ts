@@ -51,7 +51,7 @@ interface RealtimeStore {
 // ============================================================================
 
 const DEFAULT_MAX_NOTIFICATIONS = 50;
-const IGNORED_EVENTS: EventName[] = ["system:heartbeat"];
+const IGNORED_EVENTS: EventName[] = ["system:heartbeat", "system:connected"];
 
 let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

@@ -135,3 +135,107 @@ export interface ClientAnalysisResult {
   recommendation: string;
 }
 
+// ---------------------------------------------------------------------------
+// Interview Prep
+// ---------------------------------------------------------------------------
+
+export interface InterviewPrepInput {
+  jobTitle: string;
+  jobDescription: string;
+  jobType: string;
+  skillsRequired: string[];
+  experienceLevel: string | null;
+}
+
+export interface InterviewQuestion {
+  question: string;
+  category: "technical" | "behavioral" | "situational" | "client-specific";
+  difficulty: "easy" | "medium" | "hard";
+  suggestedAnswer: string;
+  tips: string;
+}
+
+export interface InterviewPrepResult {
+  questions: InterviewQuestion[];
+  overallTips: string[];
+  communicationAdvice: string;
+}
+
+// ---------------------------------------------------------------------------
+// Bid Strategy
+// ---------------------------------------------------------------------------
+
+export interface BidStrategyInput {
+  jobTitle: string;
+  jobDescription: string;
+  jobType: string;
+  skillsRequired: string[];
+  budgetMin: number | null;
+  budgetMax: number | null;
+  hourlyRateMin: number | null;
+  hourlyRateMax: number | null;
+  estimatedDuration: string | null;
+  clientCountry: string | null;
+  clientTotalSpent: number | null;
+  clientTotalHires: number | null;
+  clientHireRate: number | null;
+  clientPaymentVerified: boolean;
+  proposalsCount: number | null;
+  connectsRequired: number | null;
+  experienceLevel: string | null;
+  /** Latest AI analysis, if available. */
+  analysisContext: {
+    fitScore: number | null;
+    winProbability: number | null;
+    recommendation: string | null;
+    suggestedRate: number | null;
+  } | null;
+}
+
+export interface BidStrategyResult {
+  recommendedRate: number;
+  rateRangeMin: number;
+  rateRangeMax: number;
+  rateJustification: string;
+  positioningStrategy: string;
+  differentiators: string[];
+  openingHook: string;
+  competitiveAdvantages: string[];
+  pricingTactics: string[];
+  connectsWorth: boolean;
+  connectsReasoning: string;
+  urgencyLevel: "low" | "medium" | "high";
+  urgencyReasoning: string;
+  bestTimeToApply: string;
+}
+
+// ---------------------------------------------------------------------------
+// Skill Gap Analysis
+// ---------------------------------------------------------------------------
+
+export interface SkillGapInput {
+  jobTitle: string;
+  jobDescription: string;
+  skillsRequired: string[];
+  experienceLevel: string | null;
+}
+
+export interface SkillGapItem {
+  skill: string;
+  currentLevel: "none" | "beginner" | "intermediate" | "advanced" | "expert";
+  requiredLevel: "beginner" | "intermediate" | "advanced" | "expert";
+  importance: "critical" | "important" | "nice-to-have";
+  estimatedLearningTime: string;
+  resources: { title: string; type: "course" | "docs" | "tutorial" | "practice"; url?: string }[];
+  quickWin: string;
+}
+
+export interface SkillGapResult {
+  overallReadiness: number; // 0-100
+  readyToApply: boolean;
+  summary: string;
+  gaps: SkillGapItem[];
+  strengthsToHighlight: string[];
+  learningPlan: string;
+}
+

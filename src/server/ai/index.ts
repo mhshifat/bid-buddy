@@ -17,5 +17,13 @@ export type {
   ProposalGenerationResult,
   ClientAnalysisInput,
   ClientAnalysisResult,
+  InterviewPrepInput,
+  InterviewPrepResult,
+  InterviewQuestion,
+  BidStrategyInput,
+  BidStrategyResult,
+  SkillGapInput,
+  SkillGapItem,
+  SkillGapResult,
 } from "./types";
 

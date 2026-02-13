@@ -14,6 +14,9 @@ import {
   buildJobFitPrompt,
   buildProposalPrompt,
   buildClientAnalysisPrompt,
+  buildInterviewPrepPrompt,
+  buildBidStrategyPrompt,
+  buildSkillGapPrompt,
 } from "./prompts";
 import type {
   JobAnalysisInput,
@@ -23,6 +26,12 @@ import type {
   ProposalGenerationResult,
   ClientAnalysisInput,
   ClientAnalysisResult,
+  InterviewPrepInput,
+  InterviewPrepResult,
+  BidStrategyInput,
+  BidStrategyResult,
+  SkillGapInput,
+  SkillGapResult,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -253,6 +262,146 @@ export class AiService {
     );
 
     return { noteId, result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Interview Prep
+  // -----------------------------------------------------------------------
+
+  /**
+   * Generates interview questions and suggested answers for a job.
+   */
+  async generateInterviewPrep(
+    input: InterviewPrepInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: InterviewPrepResult }> {
+    const startTime = Date.now();
+
+    logger.info(`Starting interview prep for job "${input.jobTitle}"`, {
+      tenantId,
+      provider: this.provider.name,
+    });
+
+    const freelancer =
+      freelancerOverride ??
+      (await this.repository.getFreelancerSkills(tenantId));
+
+    const messages = buildInterviewPrepPrompt(input, freelancer);
+
+    const completion = await this.provider.complete({
+      model: this.provider.defaultModel,
+      messages,
+      temperature: 0.6,
+      jsonMode: true,
+    });
+
+    const result = safeParseJson<InterviewPrepResult>(
+      completion.content,
+      "interview_prep"
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info(
+      `Interview prep complete for "${input.jobTitle}" in ${duration}ms — ${result.questions.length} questions`,
+      { tokensUsed: String(completion.tokensUsed) }
+    );
+
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Bid Strategy
+  // -----------------------------------------------------------------------
+
+  /**
+   * Generates a comprehensive bid strategy for a job.
+   */
+  async generateBidStrategy(
+    input: BidStrategyInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: BidStrategyResult }> {
+    const startTime = Date.now();
+
+    logger.info(`Starting bid strategy for "${input.jobTitle}"`, {
+      tenantId,
+      provider: this.provider.name,
+    });
+
+    const freelancer =
+      freelancerOverride ??
+      (await this.repository.getFreelancerSkills(tenantId));
+
+    const messages = buildBidStrategyPrompt(input, freelancer);
+
+    const completion = await this.provider.complete({
+      model: this.provider.defaultModel,
+      messages,
+      temperature: 0.5,
+      jsonMode: true,
+    });
+
+    const result = safeParseJson<BidStrategyResult>(
+      completion.content,
+      "bid_strategy"
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info(
+      `Bid strategy complete for "${input.jobTitle}" in ${duration}ms — recommended rate: $${result.recommendedRate}`,
+      { tokensUsed: String(completion.tokensUsed) }
+    );
+
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Skill Gap Analysis
+  // -----------------------------------------------------------------------
+
+  /**
+   * Analyses the freelancer's skill gaps for a specific job.
+   */
+  async analyseSkillGap(
+    input: SkillGapInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: SkillGapResult }> {
+    const startTime = Date.now();
+
+    logger.info(`Starting skill gap analysis for "${input.jobTitle}"`, {
+      tenantId,
+      provider: this.provider.name,
+    });
+
+    const freelancer =
+      freelancerOverride ??
+      (await this.repository.getFreelancerSkills(tenantId));
+
+    const messages = buildSkillGapPrompt(input, freelancer);
+
+    const completion = await this.provider.complete({
+      model: this.provider.defaultModel,
+      messages,
+      temperature: 0.3,
+      jsonMode: true,
+    });
+
+    const result = safeParseJson<SkillGapResult>(
+      completion.content,
+      "skill_gap"
+    );
+
+    result.overallReadiness = clamp(result.overallReadiness, 0, 100);
+
+    const duration = Date.now() - startTime;
+    logger.info(
+      `Skill gap analysis complete for "${input.jobTitle}" in ${duration}ms — readiness: ${result.overallReadiness}%`,
+      { tokensUsed: String(completion.tokensUsed) }
+    );
+
+    return { result };
   }
 
   // -----------------------------------------------------------------------

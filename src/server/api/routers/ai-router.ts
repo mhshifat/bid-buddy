@@ -27,6 +27,18 @@ const analyseClientInputSchema = z.object({
   jobId: z.string().min(1, "Job ID is required"),
 });
 
+const interviewPrepInputSchema = z.object({
+  jobId: z.string().min(1, "Job ID is required"),
+});
+
+const bidStrategyInputSchema = z.object({
+  jobId: z.string().min(1, "Job ID is required"),
+});
+
+const skillGapInputSchema = z.object({
+  jobId: z.string().min(1, "Job ID is required"),
+});
+
 // ---------------------------------------------------------------------------
 // Helper types
 // ---------------------------------------------------------------------------
@@ -271,6 +283,149 @@ export const aiRouter = createRouter({
         redFlags: result.redFlags,
         recommendation: result.recommendation,
       };
+    }),
+
+  /**
+   * Generate interview prep questions and answers for a job.
+   */
+  interviewPrep: publicProcedure
+    .input(interviewPrepInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+      });
+
+      if (!job) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job not found",
+        });
+      }
+
+      const tenantId = job.tenant_id;
+      const aiService = getAiService();
+
+      const { result } = await aiService.generateInterviewPrep(
+        {
+          jobTitle: job.title,
+          jobDescription: job.description,
+          jobType: job.job_type,
+          skillsRequired: job.skills_required,
+          experienceLevel: job.experience_level,
+        },
+        tenantId
+      );
+
+      return {
+        questions: result.questions,
+        overallTips: result.overallTips,
+        communicationAdvice: result.communicationAdvice,
+      };
+    }),
+
+  /**
+   * Generate a comprehensive bid strategy for a job.
+   */
+  bidStrategy: publicProcedure
+    .input(bidStrategyInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+        include: {
+          analyses: {
+            take: 1,
+            orderBy: { created_at: "desc" },
+            select: {
+              fit_score: true,
+              win_probability: true,
+              recommendation: true,
+              suggested_rate: true,
+            },
+          },
+        },
+      });
+
+      if (!job) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job not found",
+        });
+      }
+
+      const tenantId = job.tenant_id;
+      const aiService = getAiService();
+
+      const latestAnalysis = (job as Job & { analyses: { fit_score: number | null; win_probability: number | null; recommendation: string | null; suggested_rate: unknown }[] }).analyses[0] ?? null;
+
+      const analysisContext = latestAnalysis
+        ? {
+            fitScore: latestAnalysis.fit_score,
+            winProbability: latestAnalysis.win_probability,
+            recommendation: latestAnalysis.recommendation,
+            suggestedRate: latestAnalysis.suggested_rate
+              ? Number(latestAnalysis.suggested_rate)
+              : null,
+          }
+        : null;
+
+      const { result } = await aiService.generateBidStrategy(
+        {
+          jobTitle: job.title,
+          jobDescription: job.description,
+          jobType: job.job_type,
+          skillsRequired: job.skills_required,
+          budgetMin: job.budget_min ? Number(job.budget_min) : null,
+          budgetMax: job.budget_max ? Number(job.budget_max) : null,
+          hourlyRateMin: job.hourly_rate_min ? Number(job.hourly_rate_min) : null,
+          hourlyRateMax: job.hourly_rate_max ? Number(job.hourly_rate_max) : null,
+          estimatedDuration: job.estimated_duration,
+          clientCountry: job.client_country,
+          clientTotalSpent: job.client_total_spent ? Number(job.client_total_spent) : null,
+          clientTotalHires: job.client_total_hires,
+          clientHireRate: job.client_hire_rate ? Number(job.client_hire_rate) : null,
+          clientPaymentVerified: job.client_payment_verified,
+          proposalsCount: job.proposals_count,
+          connectsRequired: job.connects_required,
+          experienceLevel: job.experience_level,
+          analysisContext,
+        },
+        tenantId
+      );
+
+      return result;
+    }),
+
+  /**
+   * Analyse skill gaps between freelancer profile and job requirements.
+   */
+  skillGap: publicProcedure
+    .input(skillGapInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+      });
+
+      if (!job) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job not found",
+        });
+      }
+
+      const tenantId = job.tenant_id;
+      const aiService = getAiService();
+
+      const { result } = await aiService.analyseSkillGap(
+        {
+          jobTitle: job.title,
+          jobDescription: job.description,
+          skillsRequired: job.skills_required,
+          experienceLevel: job.experience_level,
+        },
+        tenantId
+      );
+
+      return result;
     }),
 
   /**

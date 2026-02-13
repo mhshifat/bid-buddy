@@ -33,6 +33,9 @@ import {
   Brain,
   Sparkles,
   Loader2,
+  MessageSquare,
+  Target,
+  BookOpen,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -40,6 +43,9 @@ import { JobStatusBadge } from "./job-status-badge";
 import { AiAnalysisPanel } from "./ai-analysis-panel";
 import { ProposalPanel } from "./proposal-panel";
 import { ClientAnalysisButton } from "./client-analysis-button";
+import { InterviewPrepPanel } from "./interview-prep-panel";
+import { BidStrategyPanel } from "./bid-strategy-panel";
+import { SkillGapPanel } from "./skill-gap-panel";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
@@ -206,7 +212,7 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="description">
-            <TabsList>
+            <TabsList className="flex-wrap">
               <TabsTrigger value="description">Description</TabsTrigger>
               <TabsTrigger value="analysis">
                 <Brain className="mr-1 h-3.5 w-3.5" />
@@ -214,6 +220,18 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
               </TabsTrigger>
               <TabsTrigger value="proposals">
                 Proposals ({job.proposals.length})
+              </TabsTrigger>
+              <TabsTrigger value="interview">
+                <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                Interview Prep
+              </TabsTrigger>
+              <TabsTrigger value="bidstrategy">
+                <Target className="mr-1 h-3.5 w-3.5" />
+                Bid Strategy
+              </TabsTrigger>
+              <TabsTrigger value="skillgap">
+                <BookOpen className="mr-1 h-3.5 w-3.5" />
+                Skill Gap
               </TabsTrigger>
               <TabsTrigger value="notes">
                 Notes ({job.notes.length})
@@ -270,6 +288,21 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
                 proposals={job.proposals}
                 onProposalGenerated={handleRefetch}
               />
+            </TabsContent>
+
+            {/* Interview Prep Tab */}
+            <TabsContent value="interview" className="mt-4">
+              <InterviewPrepPanel jobId={jobId} />
+            </TabsContent>
+
+            {/* Bid Strategy Tab */}
+            <TabsContent value="bidstrategy" className="mt-4">
+              <BidStrategyPanel jobId={jobId} />
+            </TabsContent>
+
+            {/* Skill Gap Tab */}
+            <TabsContent value="skillgap" className="mt-4">
+              <SkillGapPanel jobId={jobId} />
             </TabsContent>
 
             {/* Notes Tab */}
@@ -471,6 +504,49 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Flag as Fake
               </Button>
+              <div className="pt-1">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  More AI Tools
+                </p>
+                <div className="space-y-1.5">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="interview"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <MessageSquare className="mr-2 h-3.5 w-3.5" />
+                    Interview Prep
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="bidstrategy"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <Target className="mr-2 h-3.5 w-3.5" />
+                    Bid Strategy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="skillgap"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <BookOpen className="mr-2 h-3.5 w-3.5" />
+                    Skill Gap Analysis
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
