@@ -12,6 +12,8 @@ import {
   DollarSign,
   Clock,
   ExternalLink,
+  MessageSquare,
+  Loader2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -158,6 +160,19 @@ export function ProposalList() {
 function ProposalCard({ proposal }: { proposal: ProposalItem }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [followUp, setFollowUp] = useState<string | null>(null);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+
+  const followUpMutation = trpc.ai.followUpMessage.useMutation({
+    onSuccess: (data) => {
+      setFollowUp(data.message);
+      setShowFollowUp(true);
+      toast.success("Follow-up message generated!");
+    },
+    onError: () => {
+      toast.error("Failed to generate follow-up");
+    },
+  });
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(proposal.coverLetter);
@@ -165,6 +180,12 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
     toast.success("Cover letter copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
   }, [proposal.coverLetter]);
+
+  const handleCopyFollowUp = useCallback(async () => {
+    if (!followUp) return;
+    await navigator.clipboard.writeText(followUp);
+    toast.success("Follow-up message copied!");
+  }, [followUp]);
 
   return (
     <Card className="transition-all hover:shadow-md">
@@ -214,6 +235,26 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {proposal.status !== "DRAFT" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    disabled={followUpMutation.isPending}
+                    onClick={() => followUpMutation.mutate({ proposalId: proposal.id })}
+                  >
+                    {followUpMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <MessageSquare className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Generate follow-up message</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCopy}>
@@ -253,6 +294,40 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
           <p className="text-xs text-muted-foreground line-clamp-2">
             {proposal.coverLetter}
           </p>
+        )}
+
+        {/* Follow-Up Message */}
+        {showFollowUp && followUp && (
+          <>
+            <Separator className="my-3" />
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  AI Follow-Up Message
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={handleCopyFollowUp}
+                  >
+                    <Copy className="mr-1 h-3 w-3" /> Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => setShowFollowUp(false)}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{followUp}</p>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

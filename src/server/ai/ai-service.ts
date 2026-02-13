@@ -20,6 +20,14 @@ import {
   buildScopeEstimatorPrompt,
   buildDiscoveryQuestionsPrompt,
   buildContractAdvisorPrompt,
+  buildFollowUpPrompt,
+  buildProposalVariationsPrompt,
+  buildWeeklyDigestPrompt,
+  buildWinPatternPrompt,
+  buildProfileOptimizerPrompt,
+  buildClientIntelligencePrompt,
+  buildSmartAlertPrompt,
+  buildStyleTrainerPrompt,
 } from "./prompts";
 import type {
   JobAnalysisInput,
@@ -41,6 +49,22 @@ import type {
   DiscoveryQuestionsResult,
   ContractAdvisorInput,
   ContractAdvisorResult,
+  FollowUpMessageInput,
+  FollowUpMessageResult,
+  ProposalVariationsInput,
+  ProposalVariationsResult,
+  WeeklyDigestInput,
+  WeeklyDigestResult,
+  WinPatternInput,
+  WinPatternResult,
+  ProfileOptimizerInput,
+  ProfileOptimizerResult,
+  ClientIntelligenceInput,
+  ClientIntelligenceResult,
+  SmartAlertInput,
+  SmartAlertResult,
+  StyleTrainerInput,
+  StyleTrainerResult,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -548,6 +572,153 @@ export class AiService {
       { tokensUsed: String(completion.tokensUsed) }
     );
 
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Follow-Up Message Generator
+  // -----------------------------------------------------------------------
+
+  async generateFollowUp(
+    input: FollowUpMessageInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: FollowUpMessageResult }> {
+    const startTime = Date.now();
+    logger.info(`Starting follow-up message for "${input.jobTitle}"`, { tenantId, provider: this.provider.name });
+    const freelancer = freelancerOverride ?? (await this.repository.getFreelancerSkills(tenantId));
+    const messages = buildFollowUpPrompt(input, freelancer);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.6, jsonMode: true });
+    const result = safeParseJson<FollowUpMessageResult>(completion.content, "follow_up_message");
+    const duration = Date.now() - startTime;
+    logger.info(`Follow-up message complete for "${input.jobTitle}" in ${duration}ms`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Proposal Tone Variations
+  // -----------------------------------------------------------------------
+
+  async generateProposalVariations(
+    input: ProposalVariationsInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: ProposalVariationsResult }> {
+    const startTime = Date.now();
+    logger.info(`Starting proposal variations for "${input.jobTitle}"`, { tenantId, provider: this.provider.name });
+    const freelancer = freelancerOverride ?? (await this.repository.getFreelancerSkills(tenantId));
+    const messages = buildProposalVariationsPrompt(input, freelancer);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.7, jsonMode: true });
+    const result = safeParseJson<ProposalVariationsResult>(completion.content, "proposal_variations");
+    const duration = Date.now() - startTime;
+    logger.info(`Proposal variations complete for "${input.jobTitle}" in ${duration}ms — ${result.variations.length} variations`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Weekly Performance Digest
+  // -----------------------------------------------------------------------
+
+  async generateWeeklyDigest(
+    input: WeeklyDigestInput
+  ): Promise<{ result: WeeklyDigestResult }> {
+    const startTime = Date.now();
+    logger.info("Starting weekly performance digest", { provider: this.provider.name });
+    const messages = buildWeeklyDigestPrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.5, jsonMode: true });
+    const result = safeParseJson<WeeklyDigestResult>(completion.content, "weekly_digest");
+    const duration = Date.now() - startTime;
+    logger.info(`Weekly digest complete in ${duration}ms — grade: ${result.weeklyGrade}`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Win Pattern Analyzer
+  // -----------------------------------------------------------------------
+
+  async analyzeWinPatterns(
+    input: WinPatternInput
+  ): Promise<{ result: WinPatternResult }> {
+    const startTime = Date.now();
+    logger.info("Starting win pattern analysis", { provider: this.provider.name });
+    const messages = buildWinPatternPrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.3, jsonMode: true });
+    const result = safeParseJson<WinPatternResult>(completion.content, "win_patterns");
+    const duration = Date.now() - startTime;
+    logger.info(`Win pattern analysis complete in ${duration}ms — ${result.patterns.length} patterns found`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Profile Optimizer
+  // -----------------------------------------------------------------------
+
+  async optimizeProfile(
+    input: ProfileOptimizerInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: ProfileOptimizerResult }> {
+    const startTime = Date.now();
+    logger.info("Starting profile optimization", { tenantId, provider: this.provider.name });
+    const freelancer = freelancerOverride ?? (await this.repository.getFreelancerSkills(tenantId));
+    const messages = buildProfileOptimizerPrompt(input, freelancer);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.5, jsonMode: true });
+    const result = safeParseJson<ProfileOptimizerResult>(completion.content, "profile_optimizer");
+    result.overallScore = clamp(result.overallScore, 0, 100);
+    const duration = Date.now() - startTime;
+    logger.info(`Profile optimization complete in ${duration}ms — score: ${result.overallScore}`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Client Relationship Intelligence
+  // -----------------------------------------------------------------------
+
+  async analyzeClientIntelligence(
+    input: ClientIntelligenceInput
+  ): Promise<{ result: ClientIntelligenceResult }> {
+    const startTime = Date.now();
+    logger.info(`Starting client intelligence for "${input.clientName ?? "Unknown"}"`, { provider: this.provider.name });
+    const messages = buildClientIntelligencePrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.4, jsonMode: true });
+    const result = safeParseJson<ClientIntelligenceResult>(completion.content, "client_intelligence");
+    result.trustScore = clamp(result.trustScore, 0, 100);
+    const duration = Date.now() - startTime;
+    logger.info(`Client intelligence complete for "${input.clientName ?? "Unknown"}" in ${duration}ms — trust: ${result.trustScore}`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Smart Alerts
+  // -----------------------------------------------------------------------
+
+  async generateSmartAlerts(
+    input: SmartAlertInput
+  ): Promise<{ result: SmartAlertResult }> {
+    const startTime = Date.now();
+    logger.info("Starting smart alert generation", { provider: this.provider.name });
+    const messages = buildSmartAlertPrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.5, jsonMode: true });
+    const result = safeParseJson<SmartAlertResult>(completion.content, "smart_alerts");
+    const duration = Date.now() - startTime;
+    logger.info(`Smart alerts generated in ${duration}ms — ${result.alerts.length} alerts`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Writing Style Trainer
+  // -----------------------------------------------------------------------
+
+  async analyzeWritingStyle(
+    input: StyleTrainerInput
+  ): Promise<{ result: StyleTrainerResult }> {
+    const startTime = Date.now();
+    logger.info("Starting writing style analysis", { provider: this.provider.name });
+    const messages = buildStyleTrainerPrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.4, jsonMode: true });
+    const result = safeParseJson<StyleTrainerResult>(completion.content, "style_trainer");
+    const duration = Date.now() - startTime;
+    logger.info(`Writing style analysis complete in ${duration}ms — style: ${result.vocabularyLevel}`, { tokensUsed: String(completion.tokensUsed) });
     return { result };
   }
 

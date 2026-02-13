@@ -464,6 +464,39 @@ export const jobRouter = createRouter({
     }),
 
   /**
+   * Get AI analysis scores for jobs by their Upwork job IDs.
+   * Used by the browser extension to show Quick-Score badges on Upwork pages.
+   */
+  scoresByUpworkIds: publicProcedure
+    .input(z.object({ upworkJobIds: z.array(z.string()).max(50) }))
+    .query(async ({ ctx, input }) => {
+      if (input.upworkJobIds.length === 0) return [];
+
+      const jobs = await ctx.prisma.job.findMany({
+        where: { upwork_job_id: { in: input.upworkJobIds } },
+        select: {
+          upwork_job_id: true,
+          analyses: {
+            take: 1,
+            orderBy: { created_at: "desc" },
+            select: {
+              fit_score: true,
+              win_probability: true,
+              recommendation: true,
+            },
+          },
+        },
+      });
+
+      return jobs.map((j) => ({
+        upworkJobId: j.upwork_job_id,
+        fitScore: j.analyses[0]?.fit_score ?? null,
+        winProbability: j.analyses[0]?.win_probability ?? null,
+        recommendation: j.analyses[0]?.recommendation ?? null,
+      }));
+    }),
+
+  /**
    * Get job stats for the dashboard.
    */
   stats: publicProcedure.query(async ({ ctx }) => {

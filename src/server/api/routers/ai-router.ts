@@ -566,6 +566,443 @@ export const aiRouter = createRouter({
     }),
 
   /**
+   * Generate a follow-up message for a submitted proposal.
+   */
+  followUpMessage: publicProcedure
+    .input(z.object({ proposalId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const proposal = await ctx.prisma.proposal.findUnique({
+        where: { id: input.proposalId },
+        include: { job: true },
+      });
+
+      if (!proposal) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Proposal not found" });
+      }
+
+      const daysSince = Math.floor(
+        (Date.now() - new Date(proposal.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      const aiService = getAiService();
+      const { result } = await aiService.generateFollowUp(
+        {
+          jobTitle: proposal.job.title,
+          jobDescription: proposal.job.description,
+          proposalCoverLetter: proposal.cover_letter,
+          proposalSentAt: proposal.created_at,
+          proposalStatus: proposal.status,
+          daysSinceSubmission: daysSince,
+        },
+        proposal.job.tenant_id
+      );
+
+      return result;
+    }),
+
+  /**
+   * Generate 3 proposal tone variations for a job.
+   */
+  proposalVariations: publicProcedure
+    .input(z.object({ jobId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+        include: {
+          analyses: {
+            take: 1,
+            orderBy: { created_at: "desc" },
+            select: { fit_score: true, strengths: true, matched_skills: true, suggested_rate: true },
+          },
+        },
+      });
+
+      if (!job) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+      }
+
+      const typedJob = job as JobForAnalysis;
+      const latestAnalysis = typedJob.analyses[0] ?? null;
+      const analysisContext = latestAnalysis
+        ? {
+            fitScore: latestAnalysis.fit_score,
+            strengths: latestAnalysis.strengths,
+            matchedSkills: latestAnalysis.matched_skills,
+            suggestedRate: latestAnalysis.suggested_rate ? Number(latestAnalysis.suggested_rate) : null,
+          }
+        : null;
+
+      const aiService = getAiService();
+      const { result } = await aiService.generateProposalVariations(
+        {
+          jobTitle: job.title,
+          jobDescription: job.description,
+          jobType: job.job_type,
+          skillsRequired: job.skills_required,
+          budgetMin: job.budget_min ? Number(job.budget_min) : null,
+          budgetMax: job.budget_max ? Number(job.budget_max) : null,
+          hourlyRateMin: job.hourly_rate_min ? Number(job.hourly_rate_min) : null,
+          hourlyRateMax: job.hourly_rate_max ? Number(job.hourly_rate_max) : null,
+          estimatedDuration: job.estimated_duration,
+          analysisContext,
+        },
+        job.tenant_id
+      );
+
+      return result;
+    }),
+
+  /**
+   * Generate a weekly performance digest.
+   */
+  weeklyDigest: publicProcedure.mutation(async ({ ctx }) => {
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      jobsCaptured,
+      proposalsSent,
+      proposalsWon,
+      proposalsRejected,
+    ] = await ctx.prisma.$transaction([
+      ctx.prisma.job.count({ where: { created_at: { gte: oneWeekAgo } } }),
+      ctx.prisma.proposal.count({ where: { status: "SENT", created_at: { gte: oneWeekAgo } } }),
+      ctx.prisma.proposal.count({ where: { status: "ACCEPTED", created_at: { gte: oneWeekAgo } } }),
+      ctx.prisma.proposal.count({ where: { status: "REJECTED", created_at: { gte: oneWeekAgo } } }),
+    ]);
+
+    const connectsAgg = await ctx.prisma.connectsLedger.aggregate({
+      _sum: { amount: true },
+      where: { transaction_type: "BID_SPENT", created_at: { gte: oneWeekAgo } },
+    });
+
+    const analysisAgg = await ctx.prisma.aiAnalysis.aggregate({
+      _avg: { fit_score: true, win_probability: true },
+      where: { created_at: { gte: oneWeekAgo } },
+    });
+
+    const earningsAgg = await ctx.prisma.project.aggregate({
+      _sum: { total_earned: true },
+      where: { status: { in: ["ACTIVE", "COMPLETED"] } },
+    });
+
+    const activeProjects = await ctx.prisma.project.count({ where: { status: "ACTIVE" } });
+
+    const skills = await ctx.prisma.skill.findMany({ select: { name: true } });
+
+    const aiService = getAiService();
+    const { result } = await aiService.generateWeeklyDigest({
+      totalJobsCaptured: jobsCaptured,
+      totalProposalsSent: proposalsSent,
+      totalProposalsWon: proposalsWon,
+      totalProposalsRejected: proposalsRejected,
+      connectsSpent: connectsAgg._sum?.amount ?? 0,
+      topJobCategories: [],
+      avgFitScore: analysisAgg._avg.fit_score ?? null,
+      avgWinProbability: analysisAgg._avg.win_probability ?? null,
+      totalEarnings: earningsAgg._sum.total_earned ? Number(earningsAgg._sum.total_earned) : 0,
+      activeProjects,
+      skills: skills.map((s) => s.name),
+    });
+
+    return result;
+  }),
+
+  /**
+   * Analyse win/loss patterns from proposal history.
+   */
+  winPatterns: publicProcedure.mutation(async ({ ctx }) => {
+    const proposals = await ctx.prisma.proposal.findMany({
+      where: { status: { in: ["ACCEPTED", "REJECTED"] } },
+      include: { job: { select: { title: true, job_type: true, skills_required: true, category: true } } },
+    });
+
+    type ProposalWithJob = typeof proposals[number];
+
+    const winning = proposals
+      .filter((p: ProposalWithJob) => p.status === "ACCEPTED")
+      .map((p: ProposalWithJob) => ({
+        jobTitle: p.job.title,
+        jobType: p.job.job_type,
+        skills: p.job.skills_required,
+        rate: p.proposed_rate ? Number(p.proposed_rate) : null,
+        category: p.job.category,
+        coverLetterLength: p.cover_letter.length,
+      }));
+
+    const losing = proposals
+      .filter((p: ProposalWithJob) => p.status === "REJECTED")
+      .map((p: ProposalWithJob) => ({
+        jobTitle: p.job.title,
+        jobType: p.job.job_type,
+        skills: p.job.skills_required,
+        rate: p.proposed_rate ? Number(p.proposed_rate) : null,
+        category: p.job.category,
+        coverLetterLength: p.cover_letter.length,
+      }));
+
+    const skills = await ctx.prisma.skill.findMany({ select: { name: true } });
+
+    const aiService = getAiService();
+    const { result } = await aiService.analyzeWinPatterns({
+      winningProposals: winning,
+      losingProposals: losing,
+      freelancerSkills: skills.map((s) => s.name),
+    });
+
+    return result;
+  }),
+
+  /**
+   * Optimise freelancer's Upwork profile.
+   */
+  profileOptimizer: publicProcedure.mutation(async ({ ctx }) => {
+    const upworkProfile = await ctx.prisma.upworkProfile.findFirst();
+    const skills = await ctx.prisma.skill.findMany();
+    const githubProfile = await ctx.prisma.githubProfile.findFirst();
+
+    const acceptedCount = await ctx.prisma.proposal.count({ where: { status: "ACCEPTED" } });
+    const totalSent = await ctx.prisma.proposal.count({ where: { status: { in: ["SENT", "ACCEPTED", "REJECTED"] } } });
+    const winRate = totalSent > 0 ? Math.round((acceptedCount / totalSent) * 100) : 0;
+
+    const winningJobs = await ctx.prisma.proposal.findMany({
+      where: { status: "ACCEPTED" },
+      include: { job: { select: { job_type: true } } },
+    });
+    const winningJobTypes = [...new Set(winningJobs.map((p) => p.job.job_type))];
+
+    const topLanguages: string[] = [];
+    if (githubProfile?.top_languages && typeof githubProfile.top_languages === "object") {
+      const langs = githubProfile.top_languages as Record<string, unknown>[];
+      if (Array.isArray(langs)) {
+        for (const l of langs) {
+          if (typeof l === "object" && l !== null && "name" in l && typeof l.name === "string") {
+            topLanguages.push(l.name);
+          }
+        }
+      }
+    }
+
+    const tenantId = upworkProfile?.tenant_id ?? skills[0]?.tenant_id ?? "";
+
+    const yearsExp: Record<string, number> = {};
+    for (const s of skills) {
+      if (s.years_experience !== null) yearsExp[s.name] = Number(s.years_experience);
+    }
+
+    const aiService = getAiService();
+    const { result } = await aiService.optimizeProfile(
+      {
+        currentTitle: upworkProfile?.title ?? null,
+        currentBio: upworkProfile?.overview ?? null,
+        skills: skills.map((s) => s.name),
+        primarySkills: skills.filter((s) => s.is_primary).map((s) => s.name),
+        yearsExperience: yearsExp,
+        winningJobTypes,
+        topLanguages,
+        totalProposals: totalSent,
+        winRate,
+      },
+      tenantId
+    );
+
+    return result;
+  }),
+
+  /**
+   * Generate client relationship intelligence report from a Client record.
+   */
+  clientIntelligence: publicProcedure
+    .input(z.object({ clientId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await ctx.prisma.client.findUnique({
+        where: { id: input.clientId },
+        include: {
+          projects: {
+            select: { title: true, budget: true, status: true },
+            take: 20,
+          },
+        },
+      });
+
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client not found" });
+      }
+
+      const aiService = getAiService();
+      const { result } = await aiService.analyzeClientIntelligence({
+        clientName: client.name,
+        clientCountry: client.country ?? null,
+        clientRating: client.upwork_rating ? Number(client.upwork_rating) : null,
+        clientTotalSpent: client.total_spent ? Number(client.total_spent) : null,
+        clientTotalHires: client.total_hires ?? null,
+        clientHireRate: null,
+        clientPaymentVerified: client.payment_verified,
+        clientMemberSince: client.created_at,
+        jobs: client.projects.map((p) => ({
+          title: p.title,
+          budget: p.budget ? Number(p.budget) : null,
+          status: p.status,
+          skillsRequired: [],
+        })),
+      });
+
+      return result;
+    }),
+
+  /**
+   * Generate client relationship intelligence from a job's embedded client data.
+   * This is more practical since client info is stored inline on each job.
+   */
+  clientIntelligenceFromJob: publicProcedure
+    .input(z.object({ jobId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+      });
+
+      if (!job) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+      }
+
+      // Find other jobs with same client_country + client data to build a richer profile
+      const relatedJobs = await ctx.prisma.job.findMany({
+        where: {
+          tenant_id: job.tenant_id,
+          client_country: job.client_country,
+          id: { not: job.id },
+        },
+        select: { title: true, budget_max: true, status: true, skills_required: true },
+        take: 20,
+      });
+
+      const allJobs = [
+        {
+          title: job.title,
+          budget: job.budget_max ? Number(job.budget_max) : null,
+          status: job.status,
+          skillsRequired: job.skills_required,
+        },
+        ...relatedJobs.map((j) => ({
+          title: j.title,
+          budget: j.budget_max ? Number(j.budget_max) : null,
+          status: j.status,
+          skillsRequired: j.skills_required,
+        })),
+      ];
+
+      const aiService = getAiService();
+      const { result } = await aiService.analyzeClientIntelligence({
+        clientName: null,
+        clientCountry: job.client_country,
+        clientRating: job.client_rating ? Number(job.client_rating) : null,
+        clientTotalSpent: job.client_total_spent ? Number(job.client_total_spent) : null,
+        clientTotalHires: job.client_total_hires,
+        clientHireRate: job.client_hire_rate ? Number(job.client_hire_rate) : null,
+        clientPaymentVerified: job.client_payment_verified,
+        clientMemberSince: job.client_member_since,
+        jobs: allJobs,
+      });
+
+      return result;
+    }),
+
+  /**
+   * Generate smart alerts from pipeline data.
+   */
+  smartAlerts: publicProcedure.mutation(async ({ ctx }) => {
+    const recentJobs = await ctx.prisma.job.findMany({
+      orderBy: { created_at: "desc" },
+      take: 20,
+      include: {
+        analyses: {
+          take: 1,
+          orderBy: { created_at: "desc" },
+          select: { fit_score: true, win_probability: true },
+        },
+      },
+    });
+
+    const pendingProposals = await ctx.prisma.proposal.findMany({
+      where: { status: { in: ["DRAFT", "SENT"] } },
+      include: { job: { select: { title: true } } },
+    });
+
+    const skills = await ctx.prisma.skill.findMany({ select: { name: true } });
+
+    const analysisAgg = await ctx.prisma.aiAnalysis.aggregate({
+      _avg: { fit_score: true },
+    });
+
+    const totalSent = await ctx.prisma.proposal.count({ where: { status: { in: ["SENT", "ACCEPTED", "REJECTED"] } } });
+    const totalWon = await ctx.prisma.proposal.count({ where: { status: "ACCEPTED" } });
+    const avgWinRate = totalSent > 0 ? Math.round((totalWon / totalSent) * 100) : 0;
+
+    const connectsAgg = await ctx.prisma.connectsLedger.aggregate({
+      _sum: { amount: true },
+      where: { transaction_type: "PURCHASE" },
+    });
+
+    const aiService = getAiService();
+    const { result } = await aiService.generateSmartAlerts({
+      recentJobs: recentJobs.map((j) => ({
+        title: j.title,
+        fitScore: j.analyses[0]?.fit_score ?? null,
+        winProbability: j.analyses[0]?.win_probability ?? null,
+        postedAt: j.posted_at?.toISOString() ?? null,
+        skillsRequired: j.skills_required,
+        budgetMax: j.budget_max ? Number(j.budget_max) : null,
+      })),
+      pendingProposals: pendingProposals.map((p) => ({
+        jobTitle: p.job.title,
+        daysSinceSubmission: Math.floor(
+          (Date.now() - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24)
+        ),
+        status: p.status,
+      })),
+      freelancerSkills: skills.map((s) => s.name),
+      avgFitScore: analysisAgg._avg.fit_score ?? null,
+      avgWinRate,
+      connectsBalance: connectsAgg._sum?.amount ?? 0,
+    });
+
+    return result;
+  }),
+
+  /**
+   * Analyse the freelancer's writing style from past proposals.
+   */
+  styleTrainer: publicProcedure.mutation(async ({ ctx }) => {
+    const proposals = await ctx.prisma.proposal.findMany({
+      where: { status: { in: ["ACCEPTED", "REJECTED", "SENT"] } },
+      include: { job: { select: { title: true, job_type: true } } },
+      orderBy: { created_at: "desc" },
+      take: 20,
+    });
+
+    if (proposals.length === 0) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "You need at least 1 proposal to analyse your writing style.",
+      });
+    }
+
+    const skills = await ctx.prisma.skill.findMany({ select: { name: true } });
+
+    const aiService = getAiService();
+    const { result } = await aiService.analyzeWritingStyle({
+      sampleProposals: proposals.map((p) => ({
+        coverLetter: p.cover_letter,
+        wasAccepted: p.status === "ACCEPTED",
+        jobType: p.job.job_type,
+        jobTitle: p.job.title,
+      })),
+      freelancerSkills: skills.map((s) => s.name),
+    });
+
+    return result;
+  }),
+
+  /**
    * AI health check – verifies provider connectivity.
    */
   healthCheck: publicProcedure.query(async () => {

@@ -3,6 +3,10 @@ import { createPageMetadata } from "@/lib/seo/config";
 import { PageHeader } from "@/components/shared/page-header";
 import { DashboardStats } from "@/components/modules/dashboard/dashboard-stats";
 import { RecentJobsList } from "@/components/modules/dashboard/recent-jobs-list";
+import { TopPicksWidget } from "@/components/modules/dashboard/top-picks-widget";
+import { EarningsPipelineWidget } from "@/components/modules/dashboard/earnings-pipeline-widget";
+import { WeeklyDigestWidget } from "@/components/modules/dashboard/weekly-digest-widget";
+import { SmartAlertsWidget } from "@/components/modules/dashboard/smart-alerts-widget";
 
 export const metadata: Metadata = createPageMetadata(
   "Dashboard",
@@ -17,18 +21,17 @@ export default function DashboardPage() {
         description="Welcome back! Here's an overview of your Upwork activity."
       />
       <DashboardStats />
+      <SmartAlertsWidget />
       <div className="grid gap-6 lg:grid-cols-2">
-        <RecentJobsList />
         <div className="space-y-6">
-          {/* Placeholder for future widgets like connects tracker, analytics charts */}
-          <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed">
-            <p className="text-sm text-muted-foreground">
-              Analytics & Connects Tracker (Coming Soon)
-            </p>
-          </div>
+          <TopPicksWidget />
+          <RecentJobsList />
+        </div>
+        <div className="space-y-6">
+          <EarningsPipelineWidget />
+          <WeeklyDigestWidget />
         </div>
       </div>
     </div>
   );
 }
-

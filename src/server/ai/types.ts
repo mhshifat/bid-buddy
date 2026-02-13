@@ -376,3 +376,274 @@ export interface ContractAdvisorResult {
   upworkSpecificTips: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Follow-Up Message Generator
+// ---------------------------------------------------------------------------
+
+export interface FollowUpMessageInput {
+  jobTitle: string;
+  jobDescription: string;
+  proposalCoverLetter: string;
+  proposalSentAt: Date | string;
+  proposalStatus: string;
+  daysSinceSubmission: number;
+}
+
+export interface FollowUpMessageResult {
+  message: string;
+  tone: "friendly" | "professional" | "urgent";
+  subject: string;
+  bestTimeToSend: string;
+  tips: string[];
+  doNots: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Proposal Tone Variations
+// ---------------------------------------------------------------------------
+
+export interface ProposalVariationsInput {
+  jobTitle: string;
+  jobDescription: string;
+  jobType: string;
+  skillsRequired: string[];
+  budgetMin: number | null;
+  budgetMax: number | null;
+  hourlyRateMin: number | null;
+  hourlyRateMax: number | null;
+  estimatedDuration: string | null;
+  analysisContext: {
+    fitScore: number | null;
+    strengths: string[];
+    matchedSkills: string[];
+    suggestedRate: number | null;
+  } | null;
+}
+
+export interface ProposalVariation {
+  tone: "professional" | "conversational" | "technical";
+  toneDescription: string;
+  coverLetter: string;
+  proposedRate: number | null;
+  keyAngle: string;
+  bestFor: string;
+}
+
+export interface ProposalVariationsResult {
+  variations: ProposalVariation[];
+  recommendation: string;
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Performance Digest
+// ---------------------------------------------------------------------------
+
+export interface WeeklyDigestInput {
+  totalJobsCaptured: number;
+  totalProposalsSent: number;
+  totalProposalsWon: number;
+  totalProposalsRejected: number;
+  connectsSpent: number;
+  topJobCategories: string[];
+  avgFitScore: number | null;
+  avgWinProbability: number | null;
+  totalEarnings: number;
+  activeProjects: number;
+  skills: string[];
+}
+
+export interface WeeklyDigestResult {
+  summary: string;
+  winRate: number;
+  connectsEfficiency: string;
+  topPerformingArea: string;
+  biggestOpportunity: string;
+  actionItems: string[];
+  weeklyGrade: "A" | "B" | "C" | "D" | "F";
+  trendDirection: "improving" | "stable" | "declining";
+  motivationalNote: string;
+}
+
+// ---------------------------------------------------------------------------
+// Win Pattern Analyzer
+// ---------------------------------------------------------------------------
+
+export interface WinPatternInput {
+  winningProposals: {
+    jobTitle: string;
+    jobType: string;
+    skills: string[];
+    rate: number | null;
+    category: string | null;
+    coverLetterLength: number;
+  }[];
+  losingProposals: {
+    jobTitle: string;
+    jobType: string;
+    skills: string[];
+    rate: number | null;
+    category: string | null;
+    coverLetterLength: number;
+  }[];
+  freelancerSkills: string[];
+}
+
+export interface WinPattern {
+  pattern: string;
+  confidence: "high" | "medium" | "low";
+  impact: string;
+  recommendation: string;
+}
+
+export interface WinPatternResult {
+  overallWinRate: number;
+  patterns: WinPattern[];
+  bestJobTypes: string[];
+  bestSkillCombinations: string[];
+  optimalRateRange: { min: number; max: number } | null;
+  optimalProposalLength: string;
+  topRecommendations: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Profile Optimizer
+// ---------------------------------------------------------------------------
+
+export interface ProfileOptimizerInput {
+  currentTitle: string | null;
+  currentBio: string | null;
+  skills: string[];
+  primarySkills: string[];
+  yearsExperience: Record<string, number>;
+  winningJobTypes: string[];
+  topLanguages: string[];
+  totalProposals: number;
+  winRate: number;
+}
+
+export interface ProfileImprovement {
+  area: string;
+  current: string;
+  suggested: string;
+  impact: "high" | "medium" | "low";
+}
+
+export interface ProfileOptimizerResult {
+  overallScore: number;
+  suggestedTitle: string;
+  suggestedBio: string;
+  skillsToAdd: string[];
+  skillsToRemove: string[];
+  skillsToReorder: string[];
+  portfolioSuggestions: string[];
+  keywordOptimizations: string[];
+  nicheSuggestion: string;
+  improvements: ProfileImprovement[];
+}
+
+// ---------------------------------------------------------------------------
+// Client Relationship Intelligence
+// ---------------------------------------------------------------------------
+
+export interface ClientIntelligenceInput {
+  clientName: string | null;
+  clientCountry: string | null;
+  clientRating: number | null;
+  clientTotalSpent: number | null;
+  clientTotalHires: number | null;
+  clientHireRate: number | null;
+  clientPaymentVerified: boolean;
+  clientMemberSince: Date | string | null;
+  jobs: {
+    title: string;
+    budget: number | null;
+    status: string;
+    skillsRequired: string[];
+  }[];
+}
+
+export interface ClientIntelligenceResult {
+  trustScore: number;
+  communicationStyle: string;
+  paymentBehavior: string;
+  workPreferences: string[];
+  strengths: string[];
+  risks: string[];
+  bestApproach: string;
+  repeatWorkPotential: "high" | "medium" | "low";
+  negotiationTips: string[];
+  idealFreelancerProfile: string;
+}
+
+// ---------------------------------------------------------------------------
+// Smart Alerts
+// ---------------------------------------------------------------------------
+
+export interface SmartAlertInput {
+  recentJobs: {
+    title: string;
+    fitScore: number | null;
+    winProbability: number | null;
+    postedAt: string | null;
+    skillsRequired: string[];
+    budgetMax: number | null;
+  }[];
+  pendingProposals: {
+    jobTitle: string;
+    daysSinceSubmission: number;
+    status: string;
+  }[];
+  freelancerSkills: string[];
+  avgFitScore: number | null;
+  avgWinRate: number;
+  connectsBalance: number;
+}
+
+export interface SmartAlert {
+  type: "opportunity" | "deadline" | "stale-proposal" | "market-shift" | "milestone" | "tip";
+  priority: "high" | "medium" | "low";
+  title: string;
+  message: string;
+  actionLabel: string | null;
+  actionUrl: string | null;
+}
+
+export interface SmartAlertResult {
+  alerts: SmartAlert[];
+  summary: string;
+  nextCheckRecommendation: string;
+}
+
+// ---------------------------------------------------------------------------
+// Style Trainer
+// ---------------------------------------------------------------------------
+
+export interface StyleTrainerInput {
+  sampleProposals: {
+    coverLetter: string;
+    wasAccepted: boolean;
+    jobType: string;
+    jobTitle: string;
+  }[];
+  freelancerSkills: string[];
+}
+
+export interface StylePattern {
+  pattern: string;
+  frequency: "always" | "often" | "sometimes";
+  effectiveness: "high" | "medium" | "low";
+  example: string;
+}
+
+export interface StyleTrainerResult {
+  overallStyle: string;
+  toneProfile: string;
+  sentenceStructure: string;
+  vocabularyLevel: "simple" | "moderate" | "advanced";
+  strengthPatterns: StylePattern[];
+  weaknessPatterns: StylePattern[];
+  signaturePhrases: string[];
+  improvementSuggestions: string[];
+  styleGuide: string;
+}
+

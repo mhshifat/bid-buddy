@@ -2,13 +2,17 @@
  * Dashboard tRPC router - aggregated stats for the dashboard.
  */
 
-import type { Job } from "@prisma/client";
+import type { Job, AiAnalysis } from "@prisma/client";
 import { createRouter, publicProcedure } from "../trpc";
 
 type RecentJob = Pick<
   Job,
   "id" | "title" | "status" | "job_type" | "posted_at" | "connects_required" | "budget_max"
 >;
+
+type TopPickJob = Job & {
+  analyses: Pick<AiAnalysis, "fit_score" | "win_probability" | "recommendation">[];
+};
 
 export const dashboardRouter = createRouter({
   overview: publicProcedure.query(async ({ ctx }) => {
@@ -93,6 +97,154 @@ export const dashboardRouter = createRouter({
         connectsRequired: j.connects_required,
         budgetMax: j.budget_max ? Number(j.budget_max) : null,
       })),
+    };
+  }),
+
+  /**
+   * Top Picks — highest-scoring jobs that still need proposals.
+   */
+  topPicks: publicProcedure.query(async ({ ctx }) => {
+    const jobs = await ctx.prisma.job.findMany({
+      where: {
+        status: { in: ["NEW", "ANALYZED", "SHORTLISTED"] },
+        analyses: { some: { fit_score: { not: null } } },
+      },
+      include: {
+        analyses: {
+          take: 1,
+          orderBy: { created_at: "desc" },
+          select: { fit_score: true, win_probability: true, recommendation: true },
+        },
+      },
+      orderBy: { created_at: "desc" },
+      take: 50,
+    });
+
+    const scored = (jobs as TopPickJob[])
+      .map((j) => {
+        const a = j.analyses[0];
+        return {
+          id: j.id,
+          title: j.title,
+          jobType: j.job_type,
+          budgetMax: j.budget_max ? Number(j.budget_max) : null,
+          hourlyRateMax: j.hourly_rate_max ? Number(j.hourly_rate_max) : null,
+          clientCountry: j.client_country,
+          skillsRequired: j.skills_required,
+          postedAt: j.posted_at,
+          fitScore: a?.fit_score ?? 0,
+          winProbability: a?.win_probability ?? 0,
+          recommendation: a?.recommendation ?? null,
+        };
+      })
+      .sort((a, b) => (b.fitScore ?? 0) - (a.fitScore ?? 0))
+      .slice(0, 5);
+
+    return scored;
+  }),
+
+  /**
+   * Earnings Pipeline — forecast based on active proposals.
+   */
+  pipeline: publicProcedure.query(async ({ ctx }) => {
+    const proposals = await ctx.prisma.proposal.findMany({
+      where: { status: { in: ["SENT", "VIEWED", "SHORTLISTED"] } },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            budget_max: true,
+            hourly_rate_max: true,
+            job_type: true,
+            estimated_duration: true,
+          },
+          include: {
+            analyses: {
+              take: 1,
+              orderBy: { created_at: "desc" },
+              select: { win_probability: true },
+            },
+          },
+        },
+      },
+    });
+
+    type PipelineProposal = typeof proposals[number];
+
+    const pipelineItems = proposals.map((p: PipelineProposal) => {
+      const winProb = (p.job as unknown as { analyses: { win_probability: number | null }[] }).analyses?.[0]?.win_probability ?? 30;
+      const estimatedValue = p.proposed_rate
+        ? Number(p.proposed_rate)
+        : p.job.budget_max
+          ? Number(p.job.budget_max)
+          : 0;
+      return {
+        proposalId: p.id,
+        jobId: p.job.id,
+        jobTitle: p.job.title,
+        status: p.status,
+        estimatedValue,
+        winProbability: winProb,
+        expectedValue: Math.round(estimatedValue * (winProb / 100)),
+        createdAt: p.created_at,
+      };
+    });
+
+    const totalEstimated = pipelineItems.reduce((sum, i) => sum + i.estimatedValue, 0);
+    const totalExpected = pipelineItems.reduce((sum, i) => sum + i.expectedValue, 0);
+
+    return {
+      items: pipelineItems,
+      totalEstimated,
+      totalExpected,
+      activeProposals: pipelineItems.length,
+    };
+  }),
+
+  /**
+   * Connects ROI — tracks connects efficiency.
+   */
+  connectsRoi: publicProcedure.query(async ({ ctx }) => {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const proposals = await ctx.prisma.proposal.findMany({
+      where: { created_at: { gte: thirtyDaysAgo } },
+      select: { status: true, connects_used: true, job: { select: { job_type: true, category: true } } },
+    });
+
+    type ProposalForRoi = typeof proposals[number];
+
+    const byCategory: Record<string, { spent: number; sent: number; won: number }> = {};
+
+    for (const p of proposals) {
+      const cat = (p as ProposalForRoi).job.category ?? (p as ProposalForRoi).job.job_type;
+      if (!byCategory[cat]) byCategory[cat] = { spent: 0, sent: 0, won: 0 };
+      byCategory[cat].sent += 1;
+      byCategory[cat].spent += (p as ProposalForRoi).connects_used ?? 0;
+      if ((p as ProposalForRoi).status === "ACCEPTED") byCategory[cat].won += 1;
+    }
+
+    const categories = Object.entries(byCategory).map(([category, data]) => ({
+      category,
+      connectsSpent: data.spent,
+      proposalsSent: data.sent,
+      proposalsWon: data.won,
+      winRate: data.sent > 0 ? Math.round((data.won / data.sent) * 100) : 0,
+      costPerWin: data.won > 0 ? Math.round(data.spent / data.won) : null,
+    }));
+
+    const totalSpent = categories.reduce((s, c) => s + c.connectsSpent, 0);
+    const totalSent = categories.reduce((s, c) => s + c.proposalsSent, 0);
+    const totalWon = categories.reduce((s, c) => s + c.proposalsWon, 0);
+
+    return {
+      categories,
+      totalConnectsSpent: totalSpent,
+      totalProposalsSent: totalSent,
+      totalProposalsWon: totalWon,
+      overallWinRate: totalSent > 0 ? Math.round((totalWon / totalSent) * 100) : 0,
+      avgCostPerWin: totalWon > 0 ? Math.round(totalSpent / totalWon) : null,
     };
   }),
 });

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/seo/config";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProfileOptimizerCard } from "@/components/modules/settings/profile-optimizer-card";
+import { StyleTrainerCard } from "@/components/modules/settings/style-trainer-card";
 
 export const metadata: Metadata = createPageMetadata(
   "Settings",
@@ -16,17 +18,8 @@ export default function SettingsPage() {
         description="Configure your profile, integrations, and preferences."
       />
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Profile</CardTitle>
-            <CardDescription>Your Upwork profile and preferences.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Profile settings coming soon.
-            </p>
-          </CardContent>
-        </Card>
+        <ProfileOptimizerCard />
+        <StyleTrainerCard />
         <Card>
           <CardHeader>
             <CardTitle className="text-base">GitHub Integration</CardTitle>
@@ -34,7 +27,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              GitHub integration coming soon.
+              Visit the <a href="/github" className="text-primary hover:underline">GitHub Skills</a> page to connect your account.
             </p>
           </CardContent>
         </Card>
@@ -64,4 +57,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

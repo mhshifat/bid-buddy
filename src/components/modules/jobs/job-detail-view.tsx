@@ -39,6 +39,7 @@ import {
   ListChecks,
   HelpCircle,
   Scale,
+  Users,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -52,6 +53,8 @@ import { SkillGapPanel } from "./skill-gap-panel";
 import { ScopeEstimatorPanel } from "./scope-estimator-panel";
 import { DiscoveryQuestionsPanel } from "./discovery-questions-panel";
 import { ContractAdvisorPanel } from "./contract-advisor-panel";
+import { ProposalVariationsPanel } from "./proposal-variations-panel";
+import { ClientIntelligencePanel } from "./client-intelligence-panel";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
@@ -251,6 +254,14 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
                 <Scale className="mr-1 h-3.5 w-3.5" />
                 Contract
               </TabsTrigger>
+              <TabsTrigger value="variations">
+                <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                Variations
+              </TabsTrigger>
+              <TabsTrigger value="clientintel">
+                <Users className="mr-1 h-3.5 w-3.5" />
+                Client Intel
+              </TabsTrigger>
               <TabsTrigger value="notes">
                 Notes ({job.notes.length})
               </TabsTrigger>
@@ -336,6 +347,16 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
             {/* Contract Advisor Tab */}
             <TabsContent value="contract" className="mt-4">
               <ContractAdvisorPanel jobId={jobId} />
+            </TabsContent>
+
+            {/* Proposal Variations Tab */}
+            <TabsContent value="variations" className="mt-4">
+              <ProposalVariationsPanel jobId={jobId} />
+            </TabsContent>
+
+            {/* Client Intelligence Tab */}
+            <TabsContent value="clientintel" className="mt-4">
+              <ClientIntelligencePanel jobId={jobId} />
             </TabsContent>
 
             {/* Notes Tab */}
@@ -613,6 +634,30 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
                   >
                     <Scale className="mr-2 h-3.5 w-3.5" />
                     Contract Advisor
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="variations"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <MessageSquare className="mr-2 h-3.5 w-3.5" />
+                    Tone Variations
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="clientintel"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <Users className="mr-2 h-3.5 w-3.5" />
+                    Client Intelligence
                   </Button>
                 </div>
               </div>

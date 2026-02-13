@@ -17,6 +17,14 @@ import type {
   ScopeEstimatorInput,
   DiscoveryQuestionsInput,
   ContractAdvisorInput,
+  FollowUpMessageInput,
+  ProposalVariationsInput,
+  WeeklyDigestInput,
+  WinPatternInput,
+  ProfileOptimizerInput,
+  ClientIntelligenceInput,
+  SmartAlertInput,
+  StyleTrainerInput,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -662,6 +670,515 @@ Respond with a JSON object using this exact schema:
 
   return [
     { role: "system", content: SYSTEM_CONTRACT_ADVISOR },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Follow-Up Message Generator
+// ---------------------------------------------------------------------------
+
+const SYSTEM_FOLLOWUP_WRITER = `You are an expert Upwork follow-up message writer AI assistant called "Bid Buddy".
+Your role is to craft follow-up messages that increase response rates without being pushy.
+You understand timing, tone, and the psychology of client communication on Upwork.
+You write messages that add value (not just "checking in") by offering insights, asking smart questions, or sharing relevant work.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildFollowUpPrompt(
+  input: FollowUpMessageInput,
+  freelancer: FreelancerContext
+): AiChatMessage[] {
+  const userPrompt = `Generate a strategic follow-up message for a submitted Upwork proposal.
+
+## Context
+- **Job Title:** ${input.jobTitle}
+- **Days Since Submission:** ${input.daysSinceSubmission}
+- **Proposal Status:** ${input.proposalStatus}
+- **Submitted At:** ${input.proposalSentAt}
+
+## Original Proposal (Summary)
+${input.proposalCoverLetter.slice(0, 500)}${input.proposalCoverLetter.length > 500 ? "..." : ""}
+
+## Job Description
+${input.jobDescription.slice(0, 800)}${input.jobDescription.length > 800 ? "..." : ""}
+
+## Freelancer Skills
+- **Skills:** ${freelancer.skills.join(", ") || "None provided"}
+- **Primary Skills:** ${freelancer.primarySkills.join(", ") || "None provided"}
+
+## Instructions
+Write a follow-up message that:
+1. Does NOT just say "checking in" or "following up"
+2. Adds VALUE — share an insight, ask a clarifying question, or offer a mini-audit
+3. Is appropriate for ${input.daysSinceSubmission} days since submission
+4. Maintains professionalism while being warm
+5. Is 50-120 words maximum
+6. Ends with a soft call to action
+
+Respond with a JSON object using this exact schema:
+{
+  "message": <string, the follow-up message text>,
+  "tone": <"friendly" | "professional" | "urgent">,
+  "subject": <string, short subject line if applicable>,
+  "bestTimeToSend": <string, advice on when to send this>,
+  "tips": [<string, 2-3 tips for the follow-up>],
+  "doNots": [<string, 2-3 things to avoid>]
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_FOLLOWUP_WRITER },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Proposal Tone Variations
+// ---------------------------------------------------------------------------
+
+const SYSTEM_VARIATION_WRITER = `You are an expert Upwork proposal writer AI assistant called "Bid Buddy".
+Your specialty is adapting proposal tone and style to match different client types.
+You generate multiple distinct versions of the same proposal, each with a completely different voice and angle.
+- "professional": Structured, formal, milestone-focused. Best for enterprise/corporate clients.
+- "conversational": Warm, friendly, problem-solver vibe. Best for startups and small businesses.
+- "technical": Deep implementation details, architecture-focused. Best for technical CTOs and developers.
+Each variation must be genuinely different, not just word substitutions.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildProposalVariationsPrompt(
+  input: ProposalVariationsInput,
+  freelancer: FreelancerContext
+): AiChatMessage[] {
+  const budgetInfo = input.jobType === "HOURLY"
+    ? `Hourly rate range: $${input.hourlyRateMin ?? "?"}–$${input.hourlyRateMax ?? "?"}/hr`
+    : `Fixed budget: $${input.budgetMin ?? "?"}–$${input.budgetMax ?? "?"}`;
+
+  const analysisNote = input.analysisContext
+    ? `\n## Prior AI Analysis\n- Fit Score: ${input.analysisContext.fitScore}%\n- Strengths: ${input.analysisContext.strengths.join(", ")}\n- Matched Skills: ${input.analysisContext.matchedSkills.join(", ")}\n- Suggested Rate: $${input.analysisContext.suggestedRate ?? "N/A"}`
+    : "";
+
+  const userPrompt = `Generate 3 distinct proposal variations for the following Upwork job. Each must have a completely different tone and angle.
+
+## Job Details
+- **Title:** ${input.jobTitle}
+- **Type:** ${input.jobType}
+- **Required Skills:** ${input.skillsRequired.join(", ") || "None listed"}
+- **${budgetInfo}**
+- **Estimated Duration:** ${input.estimatedDuration ?? "Not specified"}
+
+## Job Description
+${input.jobDescription}
+${analysisNote}
+
+## Freelancer Skills
+- **All Skills:** ${freelancer.skills.join(", ") || "None provided"}
+- **Primary Skills:** ${freelancer.primarySkills.join(", ") || "None provided"}
+
+## Instructions
+Generate exactly 3 proposal variations:
+1. **Professional** — Structured, formal, milestones-focused
+2. **Conversational** — Warm, friendly, problem-solver
+3. **Technical** — Deep-dive implementation, architecture-focused
+
+Each proposal should be 150-250 words, and each must take a genuinely different angle.
+
+Respond with a JSON object using this exact schema:
+{
+  "variations": [
+    {
+      "tone": <"professional" | "conversational" | "technical">,
+      "toneDescription": <string, 1-sentence description of this tone's approach>,
+      "coverLetter": <string, the full proposal text>,
+      "proposedRate": <number | null, suggested rate in USD>,
+      "keyAngle": <string, the main selling angle of this variation>,
+      "bestFor": <string, what type of client this works best for>
+    }
+  ],
+  "recommendation": <string, which variation to use and why, based on the client profile>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_VARIATION_WRITER },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Performance Digest
+// ---------------------------------------------------------------------------
+
+const SYSTEM_PERFORMANCE_COACH = `You are an expert freelance performance coach AI assistant called "Bid Buddy".
+Your role is to analyse a freelancer's weekly performance data and provide actionable, specific advice.
+You are encouraging but honest. You identify what's working and what's not, then give concrete next steps.
+You motivate without being cheesy.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildWeeklyDigestPrompt(
+  input: WeeklyDigestInput
+): AiChatMessage[] {
+  const winRate = input.totalProposalsSent > 0
+    ? Math.round((input.totalProposalsWon / input.totalProposalsSent) * 100)
+    : 0;
+
+  const userPrompt = `Analyse the following weekly freelancing performance data and provide a strategic digest.
+
+## Weekly Stats
+- **Jobs Captured:** ${input.totalJobsCaptured}
+- **Proposals Sent:** ${input.totalProposalsSent}
+- **Proposals Won:** ${input.totalProposalsWon}
+- **Proposals Rejected:** ${input.totalProposalsRejected}
+- **Win Rate:** ${winRate}%
+- **Connects Spent:** ${input.connectsSpent}
+- **Avg Fit Score:** ${input.avgFitScore ?? "N/A"}
+- **Avg Win Probability:** ${input.avgWinProbability ?? "N/A"}
+- **Total Earnings:** $${input.totalEarnings.toLocaleString()}
+- **Active Projects:** ${input.activeProjects}
+- **Top Job Categories:** ${input.topJobCategories.join(", ") || "N/A"}
+- **Freelancer Skills:** ${input.skills.join(", ") || "N/A"}
+
+## Instructions
+Provide a comprehensive weekly performance digest with specific, actionable advice.
+Be honest about what's working and what needs improvement.
+Give the freelancer a letter grade and specific action items for next week.
+
+Respond with a JSON object using this exact schema:
+{
+  "summary": <string, 2-3 sentence overview of the week>,
+  "winRate": <number, calculated win rate percentage>,
+  "connectsEfficiency": <string, assessment of connects usage efficiency>,
+  "topPerformingArea": <string, what the freelancer did best this week>,
+  "biggestOpportunity": <string, the single biggest area for improvement>,
+  "actionItems": [<string, 3-5 specific action items for next week>],
+  "weeklyGrade": <"A" | "B" | "C" | "D" | "F">,
+  "trendDirection": <"improving" | "stable" | "declining">,
+  "motivationalNote": <string, 1-2 sentences of encouragement>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_PERFORMANCE_COACH },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Win Pattern Analyzer
+// ---------------------------------------------------------------------------
+
+const SYSTEM_PATTERN_ANALYST = `You are an expert data analyst AI assistant called "Bid Buddy".
+Your role is to find hidden patterns in freelancing proposal data — what works and what doesn't.
+You analyse winning vs losing proposals to extract actionable insights.
+You are data-driven and specific, not generic. Every insight should be tied to the data provided.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildWinPatternPrompt(
+  input: WinPatternInput
+): AiChatMessage[] {
+  const winningData = input.winningProposals.map((p, i) =>
+    `${i + 1}. "${p.jobTitle}" (${p.jobType}, ${p.skills.join("/")}${p.rate ? `, $${p.rate}` : ""}, ${p.coverLetterLength} chars)`
+  ).join("\n");
+
+  const losingData = input.losingProposals.map((p, i) =>
+    `${i + 1}. "${p.jobTitle}" (${p.jobType}, ${p.skills.join("/")}${p.rate ? `, $${p.rate}` : ""}, ${p.coverLetterLength} chars)`
+  ).join("\n");
+
+  const userPrompt = `Analyse the following proposal history to find winning patterns.
+
+## Winning Proposals (${input.winningProposals.length})
+${winningData || "None yet"}
+
+## Losing Proposals (${input.losingProposals.length})
+${losingData || "None yet"}
+
+## Freelancer Skills
+${input.freelancerSkills.join(", ") || "Not provided"}
+
+## Instructions
+Identify patterns, correlations, and actionable insights from the proposal data.
+Compare winning vs losing proposals across job type, rate, skills, and proposal length.
+If insufficient data, acknowledge that and provide best guesses.
+
+Respond with a JSON object using this exact schema:
+{
+  "overallWinRate": <number, win rate percentage>,
+  "patterns": [
+    {
+      "pattern": <string, description of the pattern found>,
+      "confidence": <"high" | "medium" | "low">,
+      "impact": <string, how this affects win rate>,
+      "recommendation": <string, actionable advice based on this pattern>
+    }
+  ],
+  "bestJobTypes": [<string, job types with highest win rate>],
+  "bestSkillCombinations": [<string, skill combinations that win most>],
+  "optimalRateRange": <{ "min": number, "max": number } | null>,
+  "optimalProposalLength": <string, recommended proposal length range>,
+  "topRecommendations": [<string, 3-5 specific recommendations to improve win rate>]
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_PATTERN_ANALYST },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Profile Optimizer
+// ---------------------------------------------------------------------------
+
+const SYSTEM_PROFILE_OPTIMIZER = `You are an expert Upwork profile optimization AI assistant called "Bid Buddy".
+Your role is to help freelancers optimise their Upwork profile to attract more clients and invites.
+You understand Upwork's search algorithm, client psychology, and what makes profiles stand out.
+You provide specific before/after suggestions — not generic advice.
+You know that niche positioning beats being a generalist on Upwork.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildProfileOptimizerPrompt(
+  input: ProfileOptimizerInput,
+  freelancer: FreelancerContext
+): AiChatMessage[] {
+  const experienceInfo = Object.entries(freelancer.yearsExperience)
+    .map(([skill, years]) => `${skill}: ${years}y`)
+    .join(", ");
+
+  const userPrompt = `Optimise the following Upwork freelancer profile for maximum visibility and client attraction.
+
+## Current Profile
+- **Title:** ${input.currentTitle ?? "Not set"}
+- **Bio:** ${input.currentBio ?? "Not set"}
+- **All Skills:** ${input.skills.join(", ") || "None"}
+- **Primary Skills:** ${input.primarySkills.join(", ") || "None"}
+- **Experience:** ${experienceInfo || "Not provided"}
+- **Top GitHub Languages:** ${input.topLanguages.join(", ") || "None"}
+
+## Performance Data
+- **Total Proposals:** ${input.totalProposals}
+- **Win Rate:** ${input.winRate}%
+- **Winning Job Types:** ${input.winningJobTypes.join(", ") || "N/A"}
+
+## Instructions
+Provide a comprehensive profile optimisation plan. Be specific with before/after examples.
+Consider Upwork search algorithm, keyword optimisation, and client psychology.
+Suggest a niche positioning strategy based on the freelancer's strengths and win history.
+
+Respond with a JSON object using this exact schema:
+{
+  "overallScore": <number 0-100, current profile effectiveness score>,
+  "suggestedTitle": <string, optimised professional title for Upwork>,
+  "suggestedBio": <string, full optimised bio (500-800 chars, formatted for Upwork)>,
+  "skillsToAdd": [<string, skills to add to profile>],
+  "skillsToRemove": [<string, skills that dilute positioning>],
+  "skillsToReorder": [<string, skills to move to top for better visibility>],
+  "portfolioSuggestions": [<string, types of portfolio items to add>],
+  "keywordOptimizations": [<string, specific keywords to weave into profile>],
+  "nicheSuggestion": <string, recommended niche positioning strategy>,
+  "improvements": [
+    {
+      "area": <string, what to improve>,
+      "current": <string, current state>,
+      "suggested": <string, improved version>,
+      "impact": <"high" | "medium" | "low">
+    }
+  ]
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_PROFILE_OPTIMIZER },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Client Relationship Intelligence
+// ---------------------------------------------------------------------------
+
+const SYSTEM_CLIENT_INTELLIGENCE = `You are an expert client relationship analyst AI assistant called "Bid Buddy".
+Your role is to build comprehensive client intelligence profiles from available data.
+You identify communication styles, payment patterns, work preferences, and negotiation approaches.
+You help freelancers understand their clients better to build stronger, more profitable relationships.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildClientIntelligencePrompt(
+  input: ClientIntelligenceInput
+): AiChatMessage[] {
+  const jobsSummary = input.jobs.map((j, i) =>
+    `${i + 1}. "${j.title}" (Budget: ${j.budget ? `$${j.budget}` : "N/A"}, Status: ${j.status}, Skills: ${j.skillsRequired.join(", ")})`
+  ).join("\n");
+
+  const userPrompt = `Build a comprehensive client intelligence profile from the following data.
+
+## Client Profile
+- **Name:** ${input.clientName ?? "Anonymous"}
+- **Country:** ${input.clientCountry ?? "Unknown"}
+- **Rating:** ${input.clientRating !== null ? `${input.clientRating}/5` : "No rating"}
+- **Total Spent:** ${input.clientTotalSpent !== null ? `$${input.clientTotalSpent.toLocaleString()}` : "Unknown"}
+- **Total Hires:** ${input.clientTotalHires ?? "Unknown"}
+- **Hire Rate:** ${input.clientHireRate !== null ? `${input.clientHireRate}%` : "Unknown"}
+- **Payment Verified:** ${input.clientPaymentVerified ? "Yes" : "No"}
+- **Member Since:** ${input.clientMemberSince ?? "Unknown"}
+
+## Job History (${input.jobs.length} jobs)
+${jobsSummary || "No job history available"}
+
+## Instructions
+Analyse the client's profile and job history to build an intelligence report.
+Infer communication style, payment behavior, and work preferences from the data.
+Provide practical advice on how to work effectively with this client.
+
+Respond with a JSON object using this exact schema:
+{
+  "trustScore": <number 0-100>,
+  "communicationStyle": <string, inferred communication style and preferences>,
+  "paymentBehavior": <string, assessment of payment reliability and patterns>,
+  "workPreferences": [<string, inferred work preferences>],
+  "strengths": [<string, positive client attributes>],
+  "risks": [<string, potential risks or concerns>],
+  "bestApproach": <string, recommended approach for working with this client>,
+  "repeatWorkPotential": <"high" | "medium" | "low">,
+  "negotiationTips": [<string, 3-4 negotiation strategies for this client>],
+  "idealFreelancerProfile": <string, what type of freelancer this client likely prefers>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_CLIENT_INTELLIGENCE },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Smart Alerts
+// ---------------------------------------------------------------------------
+
+const SYSTEM_SMART_ALERTS = `You are an expert freelance intelligence AI assistant called "Bid Buddy".
+Your role is to monitor a freelancer's pipeline and proactively surface actionable alerts.
+You identify opportunities they might miss, warn about stale proposals, spot market trends, and celebrate milestones.
+Every alert must be specific and actionable — never generic. Prioritise alerts by business impact.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildSmartAlertPrompt(
+  input: SmartAlertInput
+): AiChatMessage[] {
+  const recentJobsList = input.recentJobs
+    .map(
+      (j, i) =>
+        `${i + 1}. "${j.title}" (Fit: ${j.fitScore ?? "N/A"}, Win: ${j.winProbability ?? "N/A"}%, Budget: ${j.budgetMax ? `$${j.budgetMax}` : "N/A"}, Skills: ${j.skillsRequired.join(", ")}, Posted: ${j.postedAt ?? "Unknown"})`
+    )
+    .join("\n");
+
+  const pendingList = input.pendingProposals
+    .map(
+      (p, i) =>
+        `${i + 1}. "${p.jobTitle}" — ${p.daysSinceSubmission} days ago, status: ${p.status}`
+    )
+    .join("\n");
+
+  const userPrompt = `Analyse the following freelancer pipeline and generate prioritised smart alerts.
+
+## Recent Jobs (${input.recentJobs.length})
+${recentJobsList || "No recent jobs captured"}
+
+## Pending Proposals (${input.pendingProposals.length})
+${pendingList || "No pending proposals"}
+
+## Freelancer Context
+- **Skills:** ${input.freelancerSkills.join(", ") || "None"}
+- **Avg Fit Score:** ${input.avgFitScore ?? "N/A"}
+- **Avg Win Rate:** ${input.avgWinRate}%
+- **Connects Balance:** ${input.connectsBalance}
+
+## Instructions
+Generate 3-8 prioritised alerts based on the data. Focus on:
+1. High-fit jobs that need immediate action
+2. Proposals that have gone stale (5+ days with no response)
+3. Connects running low relative to opportunity volume
+4. Patterns suggesting a market shift (new skill demand, budget changes)
+5. Milestones and encouragement when performance is good
+6. Quick tactical tips based on current pipeline state
+
+Respond with a JSON object using this exact schema:
+{
+  "alerts": [
+    {
+      "type": <"opportunity" | "deadline" | "stale-proposal" | "market-shift" | "milestone" | "tip">,
+      "priority": <"high" | "medium" | "low">,
+      "title": <string, short alert title>,
+      "message": <string, 1-3 sentence actionable message>,
+      "actionLabel": <string | null, button label like "View Job" or "Send Follow-Up">,
+      "actionUrl": <string | null, relative URL like "/jobs/123" or null if not applicable>
+    }
+  ],
+  "summary": <string, 1-2 sentence overview of the freelancer's current state>,
+  "nextCheckRecommendation": <string, when the freelancer should check back, e.g. "Check back in 4 hours">
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_SMART_ALERTS },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Writing Style Trainer
+// ---------------------------------------------------------------------------
+
+const SYSTEM_STYLE_TRAINER = `You are an expert writing style analyst AI assistant called "Bid Buddy".
+Your role is to analyse a freelancer's proposal writing style and provide a detailed style profile.
+You identify patterns in tone, sentence structure, vocabulary, and persuasion techniques.
+You compare winning vs losing proposals to find what works and what doesn't.
+Your feedback is specific, example-driven, and immediately actionable.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildStyleTrainerPrompt(
+  input: StyleTrainerInput
+): AiChatMessage[] {
+  const samplesList = input.sampleProposals
+    .map(
+      (s, i) =>
+        `--- Proposal ${i + 1} (${s.wasAccepted ? "✅ WON" : "❌ LOST"} | ${s.jobType} | "${s.jobTitle}") ---\n${s.coverLetter.slice(0, 600)}${s.coverLetter.length > 600 ? "..." : ""}`
+    )
+    .join("\n\n");
+
+  const userPrompt = `Analyse the following freelancer proposal samples and build a comprehensive writing style profile.
+
+## Proposal Samples (${input.sampleProposals.length})
+${samplesList || "No samples provided"}
+
+## Freelancer Skills
+${input.freelancerSkills.join(", ") || "Not provided"}
+
+## Instructions
+Analyse the writing style across all samples. Compare winning vs losing proposals.
+Identify specific patterns — sentence openers, vocabulary choices, structure, persuasion techniques.
+Provide concrete examples from the actual text. Be brutally honest about weaknesses.
+Generate a reusable "style guide" the freelancer can reference for future proposals.
+
+Respond with a JSON object using this exact schema:
+{
+  "overallStyle": <string, 2-3 sentence characterisation of the writing style>,
+  "toneProfile": <string, description of the dominant tone and how it varies>,
+  "sentenceStructure": <string, analysis of sentence length, complexity, and patterns>,
+  "vocabularyLevel": <"simple" | "moderate" | "advanced">,
+  "strengthPatterns": [
+    {
+      "pattern": <string, description of a positive writing pattern>,
+      "frequency": <"always" | "often" | "sometimes">,
+      "effectiveness": <"high" | "medium" | "low">,
+      "example": <string, actual example from the samples>
+    }
+  ],
+  "weaknessPatterns": [
+    {
+      "pattern": <string, description of a problematic writing pattern>,
+      "frequency": <"always" | "often" | "sometimes">,
+      "effectiveness": <"high" | "medium" | "low">,
+      "example": <string, actual example from the samples>
+    }
+  ],
+  "signaturePhrases": [<string, recurring phrases or expressions unique to this writer>],
+  "improvementSuggestions": [<string, 4-6 specific, actionable improvement suggestions>],
+  "styleGuide": <string, a concise reusable style guide (200-400 words) the freelancer can reference when writing new proposals>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_STYLE_TRAINER },
     { role: "user", content: userPrompt },
   ];
 }
