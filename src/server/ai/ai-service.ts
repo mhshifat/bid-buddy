@@ -28,6 +28,9 @@ import {
   buildClientIntelligencePrompt,
   buildSmartAlertPrompt,
   buildStyleTrainerPrompt,
+  buildScopeCreepDetectionPrompt,
+  buildDiplomaticResponsePrompt,
+  buildChangeOrderPrompt,
 } from "./prompts";
 import type {
   JobAnalysisInput,
@@ -65,6 +68,12 @@ import type {
   SmartAlertResult,
   StyleTrainerInput,
   StyleTrainerResult,
+  ScopeCreepDetectionInput,
+  ScopeCreepDetectionResult,
+  DiplomaticResponseInput,
+  DiplomaticResponseResult,
+  ChangeOrderInput,
+  ChangeOrderResult,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -719,6 +728,57 @@ export class AiService {
     const result = safeParseJson<StyleTrainerResult>(completion.content, "style_trainer");
     const duration = Date.now() - startTime;
     logger.info(`Writing style analysis complete in ${duration}ms — style: ${result.vocabularyLevel}`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Scope Creep Detection
+  // -----------------------------------------------------------------------
+
+  async detectScopeCreep(
+    input: ScopeCreepDetectionInput
+  ): Promise<{ result: ScopeCreepDetectionResult }> {
+    const startTime = Date.now();
+    logger.info(`Starting scope creep detection for "${input.projectTitle}"`, { provider: this.provider.name });
+    const messages = buildScopeCreepDetectionPrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.3, jsonMode: true });
+    const result = safeParseJson<ScopeCreepDetectionResult>(completion.content, "scope_creep_detection");
+    const duration = Date.now() - startTime;
+    logger.info(`Scope creep detection complete in ${duration}ms — verdict: ${result.verdict} (${result.confidence}%)`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Diplomatic Response Generator
+  // -----------------------------------------------------------------------
+
+  async generateDiplomaticResponse(
+    input: DiplomaticResponseInput
+  ): Promise<{ result: DiplomaticResponseResult }> {
+    const startTime = Date.now();
+    logger.info(`Starting diplomatic response for "${input.projectTitle}"`, { provider: this.provider.name });
+    const messages = buildDiplomaticResponsePrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.6, jsonMode: true });
+    const result = safeParseJson<DiplomaticResponseResult>(completion.content, "diplomatic_response");
+    const duration = Date.now() - startTime;
+    logger.info(`Diplomatic response generated in ${duration}ms — tone: ${result.tone}`, { tokensUsed: String(completion.tokensUsed) });
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Change Order Generator
+  // -----------------------------------------------------------------------
+
+  async generateChangeOrder(
+    input: ChangeOrderInput
+  ): Promise<{ result: ChangeOrderResult }> {
+    const startTime = Date.now();
+    logger.info(`Starting change order generation for "${input.projectTitle}"`, { provider: this.provider.name });
+    const messages = buildChangeOrderPrompt(input);
+    const completion = await this.provider.complete({ model: this.provider.defaultModel, messages, temperature: 0.4, jsonMode: true });
+    const result = safeParseJson<ChangeOrderResult>(completion.content, "change_order");
+    const duration = Date.now() - startTime;
+    logger.info(`Change order generated in ${duration}ms — total: $${result.totalAdditionalCost}`, { tokensUsed: String(completion.tokensUsed) });
     return { result };
   }
 

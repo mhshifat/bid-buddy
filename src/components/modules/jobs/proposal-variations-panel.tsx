@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -60,6 +60,18 @@ interface ProposalVariationsPanelProps {
 
 export function ProposalVariationsPanel({ jobId }: ProposalVariationsPanelProps) {
   const [result, setResult] = useState<ProposalVariationsResult | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "PROPOSAL_VARIATIONS", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as ProposalVariationsResult);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.proposalVariations.useMutation({
     onSuccess: (data) => {

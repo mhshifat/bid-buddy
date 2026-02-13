@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -64,6 +64,19 @@ export function ProfileOptimizerCard() {
   const [result, setResult] = useState<ProfileOptimizerResult | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "PROFILE_OPTIMIZER" },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as ProfileOptimizerResult);
+      setExpanded(true);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.profileOptimizer.useMutation({
     onSuccess: (data) => {

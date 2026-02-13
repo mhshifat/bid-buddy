@@ -5,7 +5,7 @@
  * Provides pricing, positioning, and timing advice.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,6 +81,18 @@ export function BidStrategyPanel({ jobId }: BidStrategyPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BidStrategyData | null>(null);
   const [hookCopied, setHookCopied] = useState(false);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "BID_STRATEGY", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as BidStrategyData);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.bidStrategy.useMutation({
     onSuccess: (data) => {

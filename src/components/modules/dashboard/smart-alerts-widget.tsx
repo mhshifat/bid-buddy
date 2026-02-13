@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -67,6 +67,18 @@ function getAlertIcon(type: SmartAlert["type"]) {
 
 export function SmartAlertsWidget() {
   const [result, setResult] = useState<SmartAlertResult | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "SMART_ALERTS" },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as SmartAlertResult);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.smartAlerts.useMutation({
     onSuccess: (data) => {

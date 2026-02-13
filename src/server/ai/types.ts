@@ -647,3 +647,93 @@ export interface StyleTrainerResult {
   styleGuide: string;
 }
 
+// ---------------------------------------------------------------------------
+// Scope Creep Detection
+// ---------------------------------------------------------------------------
+
+export interface ScopeCreepDetectionInput {
+  projectTitle: string;
+  originalScope: string;
+  deliverables: string[];
+  exclusions: string[];
+  agreedBudget: number | null;
+  agreedTimeline: string | null;
+  revisionLimit: number | null;
+  clientMessage: string;
+}
+
+export interface ScopeCreepDetectionResult {
+  isOutOfScope: boolean;
+  confidence: number; // 0-100
+  verdict: "IN_SCOPE" | "OUT_OF_SCOPE" | "GRAY_AREA";
+  reasoning: string;
+  originalScopeItems: string[];
+  requestedItems: string[];
+  overlappingItems: string[];
+  newItems: string[];
+  riskLevel: "low" | "medium" | "high";
+  impactAssessment: {
+    timeImpact: string;
+    costImpact: string;
+    qualityImpact: string;
+  };
+  suggestedAction: "accept" | "negotiate" | "decline";
+  quickSummary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Diplomatic Response Generator (for scope creep pushback)
+// ---------------------------------------------------------------------------
+
+export interface DiplomaticResponseInput {
+  projectTitle: string;
+  clientMessage: string;
+  scopeAnalysis: ScopeCreepDetectionResult;
+  originalDeliverables: string[];
+  tone: "firm" | "friendly" | "neutral";
+  freelancerName?: string;
+}
+
+export interface DiplomaticResponseResult {
+  response: string;
+  tone: "firm" | "friendly" | "neutral";
+  keyPoints: string[];
+  whatToAvoidSaying: string[];
+  followUpSuggestions: string[];
+  alternativeOffers: string[];
+  escalationPath: string;
+}
+
+// ---------------------------------------------------------------------------
+// Change Order Generator
+// ---------------------------------------------------------------------------
+
+export interface ChangeOrderInput {
+  projectTitle: string;
+  clientMessage: string;
+  scopeAnalysis: ScopeCreepDetectionResult;
+  originalBudget: number | null;
+  originalTimeline: string | null;
+  freelancerHourlyRate: number | null;
+}
+
+export interface ChangeOrderLineItem {
+  description: string;
+  hours: number;
+  rate: number;
+  total: number;
+}
+
+export interface ChangeOrderResult {
+  summary: string;
+  lineItems: ChangeOrderLineItem[];
+  totalAdditionalCost: number;
+  totalAdditionalHours: number;
+  newTimeline: string;
+  justification: string;
+  termsAndConditions: string[];
+  clientMessage: string; // Pre-written message to send to client
+  paymentTerms: string;
+  notes: string[];
+}
+

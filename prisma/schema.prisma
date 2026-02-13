@@ -30,7 +30,10 @@ model Tenant {
   skills           Skill[]
   connects_ledger  ConnectsLedger[]
   ai_analyses      AiAnalysis[]
+  ai_insights      AiInsight[]
   templates        ProposalTemplate[]
+  project_scopes   ProjectScope[]
+  scope_change_requests ScopeChangeRequest[]
 
   @@map("tenants")
 }
@@ -215,6 +218,8 @@ model Job {
   proposals     Proposal[]
   tags          JobTag[]
   notes         JobNote[]
+  ai_insights   AiInsight[]
+  scopes        ProjectScope[]
 
   @@unique([tenant_id, upwork_job_id])
   @@index([tenant_id, status])
@@ -332,9 +337,10 @@ model Proposal {
   created_at        DateTime       @default(now())
   updated_at        DateTime       @updatedAt
 
-  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  job    Job    @relation(fields: [job_id], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tenant      Tenant      @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  ai_insights AiInsight[]
 
   @@index([tenant_id, status])
   @@index([job_id])
@@ -402,6 +408,7 @@ model Project {
   milestones Milestone[]
   tasks      Task[]
   time_logs  TimeLog[]
+  scopes     ProjectScope[]
 
   @@index([tenant_id, status])
   @@index([client_id])
@@ -617,6 +624,114 @@ model ConnectsLedger {
 
   @@index([tenant_id, created_at])
   @@map("connects_ledger")
+}
+
+// ============================================================================
+// AI Insights (Persisted AI-generated data for all feature types)
+// ============================================================================
+
+enum InsightType {
+  BID_STRATEGY
+  INTERVIEW_PREP
+  SKILL_GAP
+  SCOPE_ESTIMATE
+  DISCOVERY_QUESTIONS
+  CONTRACT_ADVISOR
+  PROPOSAL_VARIATIONS
+  CLIENT_INTELLIGENCE
+  FOLLOW_UP_MESSAGE
+  SMART_ALERTS
+  STYLE_TRAINER
+  WEEKLY_DIGEST
+  WIN_PATTERNS
+  PROFILE_OPTIMIZER
+  SCOPE_CREEP_DETECTION
+  SCOPE_CREEP_RESPONSE
+  CHANGE_ORDER
+}
+
+model AiInsight {
+  id           String      @id @default(cuid())
+  tenant_id    String
+  job_id       String?
+  proposal_id  String?
+  insight_type InsightType
+  result       Json
+  model_used   String?
+  tokens_used  Int?
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  job      Job?      @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  proposal Proposal? @relation(fields: [proposal_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, insight_type])
+  @@index([job_id, insight_type])
+  @@index([proposal_id, insight_type])
+  @@map("ai_insights")
+}
+
+// ============================================================================
+// Scope Shield – Scope Creep Protection
+// ============================================================================
+
+enum ScopeChangeStatus {
+  DETECTED
+  ACCEPTED
+  DECLINED
+  NEGOTIATED
+}
+
+model ProjectScope {
+  id                  String   @id @default(cuid())
+  tenant_id           String
+  project_id          String?
+  job_id              String?
+  title               String
+  original_description String
+  deliverables        String[]
+  exclusions          String[]
+  milestones          String[]
+  agreed_budget       Decimal? @db.Decimal(12, 2)
+  agreed_timeline     String?
+  revision_limit      Int?
+  notes               String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  tenant          Tenant              @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  project         Project?            @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  job             Job?                @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  change_requests ScopeChangeRequest[]
+
+  @@index([tenant_id])
+  @@index([project_id])
+  @@index([job_id])
+  @@map("project_scopes")
+}
+
+model ScopeChangeRequest {
+  id                String            @id @default(cuid())
+  scope_id          String
+  tenant_id         String
+  client_message    String
+  is_out_of_scope   Boolean           @default(false)
+  ai_analysis       Json?
+  ai_response       Json?
+  change_order      Json?
+  status            ScopeChangeStatus @default(DETECTED)
+  estimated_cost    Decimal?          @db.Decimal(12, 2)
+  estimated_hours   Decimal?          @db.Decimal(8, 2)
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+
+  scope  ProjectScope @relation(fields: [scope_id], references: [id], onDelete: Cascade)
+  tenant Tenant       @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([scope_id])
+  @@index([tenant_id])
+  @@map("scope_change_requests")
 }
 
 // ============================================================================

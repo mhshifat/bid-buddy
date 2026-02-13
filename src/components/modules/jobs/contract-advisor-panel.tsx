@@ -6,7 +6,7 @@
  * unfavorable terms.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,6 +94,18 @@ const riskBorderColors: Record<string, string> = {
 export function ContractAdvisorPanel({ jobId }: ContractAdvisorPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ContractData | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "CONTRACT_ADVISOR", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as ContractData);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.contractAdvisor.useMutation({
     onSuccess: (data) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,18 @@ const trendIcons: Record<string, React.ReactNode> = {
 
 export function WeeklyDigestWidget() {
   const [result, setResult] = useState<WeeklyDigestResult | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "WEEKLY_DIGEST" },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as WeeklyDigestResult);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.weeklyDigest.useMutation({
     onSuccess: (data) => {

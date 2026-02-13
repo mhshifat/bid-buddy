@@ -25,6 +25,9 @@ import type {
   ClientIntelligenceInput,
   SmartAlertInput,
   StyleTrainerInput,
+  ScopeCreepDetectionInput,
+  DiplomaticResponseInput,
+  ChangeOrderInput,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -1179,6 +1182,186 @@ Respond with a JSON object using this exact schema:
 
   return [
     { role: "system", content: SYSTEM_STYLE_TRAINER },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Scope Creep Detection
+// ---------------------------------------------------------------------------
+
+const SYSTEM_SCOPE_CREEP_DETECTION = `You are an expert freelance contract analyst AI called "Bid Buddy — Scope Shield".
+Your role is to analyse a client's message and determine whether the request falls within the originally agreed project scope or constitutes scope creep.
+You are precise, fair, and thorough. You compare the request against the documented deliverables, exclusions, budget, and timeline.
+You give a clear verdict with supporting evidence and practical advice.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildScopeCreepDetectionPrompt(input: ScopeCreepDetectionInput): AiChatMessage[] {
+  const userPrompt = `Analyse the following client message and determine if it is within the original project scope or if it represents scope creep.
+
+## Project Information
+- **Title:** ${input.projectTitle}
+- **Original Scope Description:** ${input.originalScope}
+- **Agreed Deliverables:** ${input.deliverables.length > 0 ? input.deliverables.map((d, i) => `${i + 1}. ${d}`).join("\n") : "None documented"}
+- **Documented Exclusions:** ${input.exclusions.length > 0 ? input.exclusions.map((e, i) => `${i + 1}. ${e}`).join("\n") : "None documented"}
+- **Agreed Budget:** ${input.agreedBudget ? `$${input.agreedBudget}` : "Not specified"}
+- **Agreed Timeline:** ${input.agreedTimeline ?? "Not specified"}
+- **Revision Limit:** ${input.revisionLimit !== null ? `${input.revisionLimit} revisions` : "Not specified"}
+
+## Client's New Message / Request
+"${input.clientMessage}"
+
+## Instructions
+1. Compare the client's request against EACH agreed deliverable and exclusion
+2. Identify what in this request overlaps with existing scope and what is new
+3. Assess the impact on time, cost, and quality
+4. Give a clear verdict: IN_SCOPE, OUT_OF_SCOPE, or GRAY_AREA
+5. Suggest the best action: accept, negotiate, or decline
+
+Respond with a JSON object using this exact schema:
+{
+  "isOutOfScope": <boolean, true if the request is outside the agreed scope>,
+  "confidence": <number 0-100, how confident you are in the verdict>,
+  "verdict": <"IN_SCOPE" | "OUT_OF_SCOPE" | "GRAY_AREA">,
+  "reasoning": <string, 2-4 sentence explanation of the verdict with specific references to scope items>,
+  "originalScopeItems": [<string, relevant items from the original scope>],
+  "requestedItems": [<string, specific items the client is requesting>],
+  "overlappingItems": [<string, items that overlap with original scope>],
+  "newItems": [<string, items that are genuinely new/out of scope>],
+  "riskLevel": <"low" | "medium" | "high">,
+  "impactAssessment": {
+    "timeImpact": <string, estimated time impact>,
+    "costImpact": <string, estimated cost impact>,
+    "qualityImpact": <string, potential quality impact if accepted without adjustment>
+  },
+  "suggestedAction": <"accept" | "negotiate" | "decline">,
+  "quickSummary": <string, one-sentence summary a freelancer can quickly glance at>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_SCOPE_CREEP_DETECTION },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Diplomatic Response Generator
+// ---------------------------------------------------------------------------
+
+const SYSTEM_DIPLOMATIC_RESPONSE = `You are an expert freelance communication coach AI called "Bid Buddy — Scope Shield".
+Your role is to help freelancers craft professional, diplomatic responses to clients who are requesting work outside the agreed scope.
+You maintain the client relationship while firmly protecting the freelancer's boundaries and earning potential.
+You understand the power dynamics of freelance relationships on platforms like Upwork.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildDiplomaticResponsePrompt(input: DiplomaticResponseInput): AiChatMessage[] {
+  const userPrompt = `Generate a diplomatic response to a client's out-of-scope request.
+
+## Context
+- **Project:** ${input.projectTitle}
+- **Freelancer Name:** ${input.freelancerName ?? "the freelancer"}
+- **Desired Tone:** ${input.tone}
+
+## Client's Message
+"${input.clientMessage}"
+
+## Scope Analysis Summary
+- **Verdict:** ${input.scopeAnalysis.verdict}
+- **Confidence:** ${input.scopeAnalysis.confidence}%
+- **Reasoning:** ${input.scopeAnalysis.reasoning}
+- **New Items Requested:** ${input.scopeAnalysis.newItems.join(", ") || "None identified"}
+- **Risk Level:** ${input.scopeAnalysis.riskLevel}
+- **Time Impact:** ${input.scopeAnalysis.impactAssessment.timeImpact}
+- **Cost Impact:** ${input.scopeAnalysis.impactAssessment.costImpact}
+
+## Original Deliverables
+${input.originalDeliverables.map((d, i) => `${i + 1}. ${d}`).join("\n") || "None documented"}
+
+## Instructions
+Write a ${input.tone} but professional response that:
+1. Acknowledges the client's request positively
+2. References the original agreed scope
+3. Clearly explains what falls outside scope
+4. Offers constructive alternatives (change order, separate project, etc.)
+5. Maintains the relationship and shows willingness to help
+
+Respond with a JSON object using this exact schema:
+{
+  "response": <string, the full message to send to the client, formatted with paragraphs>,
+  "tone": <"firm" | "friendly" | "neutral">,
+  "keyPoints": [<string, 3-5 key points the response addresses>],
+  "whatToAvoidSaying": [<string, 3-4 things the freelancer should NOT say>],
+  "followUpSuggestions": [<string, 2-3 follow-up actions to take>],
+  "alternativeOffers": [<string, 2-3 alternative solutions to offer the client>],
+  "escalationPath": <string, what to do if the client pushes back>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_DIPLOMATIC_RESPONSE },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Change Order Generator
+// ---------------------------------------------------------------------------
+
+const SYSTEM_CHANGE_ORDER = `You are an expert freelance project manager AI called "Bid Buddy — Scope Shield".
+Your role is to generate professional change orders that clearly document additional work, costs, and timeline changes.
+You produce fair, transparent pricing that protects the freelancer while being reasonable for the client.
+You understand Upwork's contract structures and milestone-based payments.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildChangeOrderPrompt(input: ChangeOrderInput): AiChatMessage[] {
+  const userPrompt = `Generate a professional change order for additional out-of-scope work requested by a client.
+
+## Project Context
+- **Project:** ${input.projectTitle}
+- **Original Budget:** ${input.originalBudget ? `$${input.originalBudget}` : "Not specified"}
+- **Original Timeline:** ${input.originalTimeline ?? "Not specified"}
+- **Freelancer's Hourly Rate:** ${input.freelancerHourlyRate ? `$${input.freelancerHourlyRate}/hr` : "Not specified"}
+
+## Client's Request
+"${input.clientMessage}"
+
+## Scope Analysis
+- **Verdict:** ${input.scopeAnalysis.verdict}
+- **New Items:** ${input.scopeAnalysis.newItems.join(", ") || "General additional work"}
+- **Time Impact:** ${input.scopeAnalysis.impactAssessment.timeImpact}
+- **Cost Impact:** ${input.scopeAnalysis.impactAssessment.costImpact}
+- **Risk Level:** ${input.scopeAnalysis.riskLevel}
+
+## Instructions
+Generate a clear, professional change order that:
+1. Breaks down the additional work into line items with hours and cost
+2. Uses the freelancer's hourly rate (or estimate a fair rate if not provided)
+3. Provides a new timeline that accounts for the additional work
+4. Includes a pre-written message to send to the client
+5. Adds terms and conditions to protect the freelancer
+
+Respond with a JSON object using this exact schema:
+{
+  "summary": <string, brief summary of the change order>,
+  "lineItems": [
+    {
+      "description": <string, what the work involves>,
+      "hours": <number, estimated hours>,
+      "rate": <number, hourly rate in USD>,
+      "total": <number, hours × rate>
+    }
+  ],
+  "totalAdditionalCost": <number, sum of all line item totals>,
+  "totalAdditionalHours": <number, sum of all hours>,
+  "newTimeline": <string, updated project timeline>,
+  "justification": <string, why this work warrants additional payment>,
+  "termsAndConditions": [<string, 3-5 protective terms>],
+  "clientMessage": <string, pre-written professional message to send to the client proposing the change order>,
+  "paymentTerms": <string, suggested payment structure for the additional work>,
+  "notes": [<string, 2-3 additional notes or recommendations>]
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_CHANGE_ORDER },
     { role: "user", content: userPrompt },
   ];
 }

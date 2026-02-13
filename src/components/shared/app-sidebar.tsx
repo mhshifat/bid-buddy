@@ -16,6 +16,7 @@ import {
   Settings,
   Zap,
   TrendingUp,
+  Shield,
 } from "lucide-react";
 import {
   Sidebar,
@@ -65,6 +66,11 @@ const toolsNavItems = [
     label: "AI Analysis",
     href: "/ai-analysis",
     icon: Zap,
+  },
+  {
+    label: "Scope Shield",
+    href: "/scope-shield",
+    icon: Shield,
   },
   {
     label: "Analytics",

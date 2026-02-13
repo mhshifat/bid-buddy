@@ -6,7 +6,7 @@
  * Helps freelancers avoid underquoting and scope creep.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -111,6 +111,18 @@ const complexityColors: Record<string, string> = {
 export function ScopeEstimatorPanel({ jobId }: ScopeEstimatorPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScopeData | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "SCOPE_ESTIMATE", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as ScopeData);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.scopeEstimate.useMutation({
     onSuccess: (data) => {

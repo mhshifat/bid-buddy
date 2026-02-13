@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -66,6 +66,19 @@ export function StyleTrainerCard() {
   const [result, setResult] = useState<StyleTrainerResult | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "STYLE_TRAINER" },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as StyleTrainerResult);
+      setExpanded(true);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.styleTrainer.useMutation({
     onSuccess: (data) => {

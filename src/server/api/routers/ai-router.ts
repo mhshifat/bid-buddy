@@ -1,15 +1,17 @@
 /**
  * AI tRPC router – exposes AI analysis and proposal generation endpoints.
+ * All AI-generated data is persisted to the ai_insights table for caching.
  */
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicProcedure } from "../trpc";
 import { getAiService } from "@/server/ai";
+import { AiRepository } from "@/server/ai/ai-repository";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events";
 import { generateCorrelationId } from "@/server/lib/correlation-id";
-import type { AiAnalysis, Job } from "@prisma/client";
+import type { AiAnalysis, Job, InsightType, PrismaClient } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -51,6 +53,48 @@ const contractAdvisorInputSchema = z.object({
   jobId: z.string().min(1, "Job ID is required"),
 });
 
+const insightTypeEnum = z.enum([
+  "BID_STRATEGY",
+  "INTERVIEW_PREP",
+  "SKILL_GAP",
+  "SCOPE_ESTIMATE",
+  "DISCOVERY_QUESTIONS",
+  "CONTRACT_ADVISOR",
+  "PROPOSAL_VARIATIONS",
+  "CLIENT_INTELLIGENCE",
+  "FOLLOW_UP_MESSAGE",
+  "SMART_ALERTS",
+  "STYLE_TRAINER",
+  "WEEKLY_DIGEST",
+  "WIN_PATTERNS",
+  "PROFILE_OPTIMIZER",
+]);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Save an AI insight and return its id. Fire-and-forget friendly. */
+async function persistInsight(
+  prisma: PrismaClient,
+  params: {
+    tenantId: string;
+    insightType: InsightType;
+    result: unknown;
+    jobId?: string | null;
+    proposalId?: string | null;
+  }
+): Promise<string> {
+  const repo = new AiRepository(prisma);
+  return repo.saveInsight({
+    tenantId: params.tenantId,
+    insightType: params.insightType,
+    result: params.result,
+    jobId: params.jobId,
+    proposalId: params.proposalId,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Helper types
 // ---------------------------------------------------------------------------
@@ -64,6 +108,59 @@ type JobForAnalysis = Job & {
 // ---------------------------------------------------------------------------
 
 export const aiRouter = createRouter({
+  /**
+   * Retrieve the most recently cached AI insight for a given type + scope.
+   * Returns null if nothing has been generated yet.
+   */
+  getCachedInsight: publicProcedure
+    .input(
+      z.object({
+        insightType: insightTypeEnum,
+        jobId: z.string().optional(),
+        proposalId: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      // Derive tenant from job or proposal if provided
+      let tenantId: string | null = null;
+
+      if (input.jobId) {
+        const job = await ctx.prisma.job.findUnique({
+          where: { id: input.jobId },
+          select: { tenant_id: true },
+        });
+        tenantId = job?.tenant_id ?? null;
+      } else if (input.proposalId) {
+        const proposal = await ctx.prisma.proposal.findUnique({
+          where: { id: input.proposalId },
+          select: { tenant_id: true },
+        });
+        tenantId = proposal?.tenant_id ?? null;
+      } else {
+        // Tenant-level insights: get first tenant
+        const tenant = await ctx.prisma.tenant.findFirst({ select: { id: true } });
+        tenantId = tenant?.id ?? null;
+      }
+
+      if (!tenantId) return null;
+
+      const repo = new AiRepository(ctx.prisma as unknown as PrismaClient);
+      const insight = await repo.getLatestInsight({
+        tenantId,
+        insightType: input.insightType as InsightType,
+        jobId: input.jobId ?? null,
+        proposalId: input.proposalId ?? null,
+      });
+
+      if (!insight) return null;
+
+      return {
+        id: insight.id,
+        result: insight.result,
+        createdAt: insight.createdAt.toISOString(),
+      };
+    }),
+
   /**
    * Run a comprehensive AI job fit analysis.
    * Analyses the job for fit, fake probability, and win probability.
@@ -328,11 +425,20 @@ export const aiRouter = createRouter({
         tenantId
       );
 
-      return {
+      const interviewPrepResult = {
         questions: result.questions,
         overallTips: result.overallTips,
         communicationAdvice: result.communicationAdvice,
       };
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId,
+        insightType: "INTERVIEW_PREP",
+        result: interviewPrepResult,
+        jobId: job.id,
+      });
+
+      return interviewPrepResult;
     }),
 
   /**
@@ -404,6 +510,13 @@ export const aiRouter = createRouter({
         tenantId
       );
 
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId,
+        insightType: "BID_STRATEGY",
+        result,
+        jobId: job.id,
+      });
+
       return result;
     }),
 
@@ -436,6 +549,13 @@ export const aiRouter = createRouter({
         },
         tenantId
       );
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId,
+        insightType: "SKILL_GAP",
+        result,
+        jobId: job.id,
+      });
 
       return result;
     }),
@@ -475,6 +595,13 @@ export const aiRouter = createRouter({
         },
         tenantId
       );
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId,
+        insightType: "SCOPE_ESTIMATE",
+        result,
+        jobId: job.id,
+      });
 
       return result;
     }),
@@ -516,6 +643,13 @@ export const aiRouter = createRouter({
         },
         tenantId
       );
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId,
+        insightType: "DISCOVERY_QUESTIONS",
+        result,
+        jobId: job.id,
+      });
 
       return result;
     }),
@@ -562,6 +696,13 @@ export const aiRouter = createRouter({
         tenantId
       );
 
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId,
+        insightType: "CONTRACT_ADVISOR",
+        result,
+        jobId: job.id,
+      });
+
       return result;
     }),
 
@@ -596,6 +737,14 @@ export const aiRouter = createRouter({
         },
         proposal.job.tenant_id
       );
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: proposal.job.tenant_id,
+        insightType: "FOLLOW_UP_MESSAGE",
+        result,
+        proposalId: proposal.id,
+        jobId: proposal.job_id,
+      });
 
       return result;
     }),
@@ -648,6 +797,13 @@ export const aiRouter = createRouter({
         },
         job.tenant_id
       );
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: job.tenant_id,
+        insightType: "PROPOSAL_VARIATIONS",
+        result,
+        jobId: job.id,
+      });
 
       return result;
     }),
@@ -704,6 +860,16 @@ export const aiRouter = createRouter({
       skills: skills.map((s) => s.name),
     });
 
+    // Persist weekly digest
+    const tenant = await ctx.prisma.tenant.findFirst({ select: { id: true } });
+    if (tenant) {
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: tenant.id,
+        insightType: "WEEKLY_DIGEST",
+        result,
+      });
+    }
+
     return result;
   }),
 
@@ -748,6 +914,16 @@ export const aiRouter = createRouter({
       losingProposals: losing,
       freelancerSkills: skills.map((s) => s.name),
     });
+
+    // Persist win patterns
+    const tenant = await ctx.prisma.tenant.findFirst({ select: { id: true } });
+    if (tenant) {
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: tenant.id,
+        insightType: "WIN_PATTERNS",
+        result,
+      });
+    }
 
     return result;
   }),
@@ -805,6 +981,14 @@ export const aiRouter = createRouter({
       tenantId
     );
 
+    if (tenantId) {
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId,
+        insightType: "PROFILE_OPTIMIZER",
+        result,
+      });
+    }
+
     return result;
   }),
 
@@ -844,6 +1028,12 @@ export const aiRouter = createRouter({
           status: p.status,
           skillsRequired: [],
         })),
+      });
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: client.tenant_id,
+        insightType: "CLIENT_INTELLIGENCE",
+        result,
       });
 
       return result;
@@ -901,6 +1091,13 @@ export const aiRouter = createRouter({
         clientPaymentVerified: job.client_payment_verified,
         clientMemberSince: job.client_member_since,
         jobs: allJobs,
+      });
+
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: job.tenant_id,
+        insightType: "CLIENT_INTELLIGENCE",
+        result,
+        jobId: job.id,
       });
 
       return result;
@@ -965,6 +1162,16 @@ export const aiRouter = createRouter({
       connectsBalance: connectsAgg._sum?.amount ?? 0,
     });
 
+    // Persist smart alerts
+    const tenantForAlerts = await ctx.prisma.tenant.findFirst({ select: { id: true } });
+    if (tenantForAlerts) {
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: tenantForAlerts.id,
+        insightType: "SMART_ALERTS",
+        result,
+      });
+    }
+
     return result;
   }),
 
@@ -998,6 +1205,16 @@ export const aiRouter = createRouter({
       })),
       freelancerSkills: skills.map((s) => s.name),
     });
+
+    // Persist style trainer
+    const tenantForStyle = await ctx.prisma.tenant.findFirst({ select: { id: true } });
+    if (tenantForStyle) {
+      await persistInsight(ctx.prisma as unknown as PrismaClient, {
+        tenantId: tenantForStyle.id,
+        insightType: "STYLE_TRAINER",
+        result,
+      });
+    }
 
     return result;
   }),

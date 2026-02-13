@@ -5,7 +5,7 @@
  * Follows the Repository pattern to encapsulate data-access logic.
  */
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, InsightType } from "@prisma/client";
 import { DatabaseError } from "@/server/lib/errors";
 import { logger } from "@/server/lib/logger";
 import type { JobFitAnalysisResult, ClientAnalysisResult } from "./types";
@@ -46,6 +46,16 @@ export interface SaveProposalParams {
   proposedDuration: string | null;
   aiGenerated: boolean;
   aiVersion: string | null;
+}
+
+export interface SaveInsightParams {
+  tenantId: string;
+  jobId?: string | null;
+  proposalId?: string | null;
+  insightType: InsightType;
+  result: unknown;
+  modelUsed?: string | null;
+  tokensUsed?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +197,88 @@ export class AiRepository {
       logger.error("Failed to fetch freelancer skills", error instanceof Error ? error : undefined);
       throw new DatabaseError(
         "getFreelancerSkills",
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Generic AI Insight persistence
+  // -----------------------------------------------------------------------
+
+  /**
+   * Saves an AI insight result to the database.
+   * Used for all AI feature types that don't have their own table.
+   */
+  async saveInsight(params: SaveInsightParams): Promise<string> {
+    try {
+      const insight = await this.prisma.aiInsight.create({
+        data: {
+          tenant_id: params.tenantId,
+          job_id: params.jobId ?? null,
+          proposal_id: params.proposalId ?? null,
+          insight_type: params.insightType,
+          result: JSON.parse(JSON.stringify(params.result)),
+          model_used: params.modelUsed ?? null,
+          tokens_used: params.tokensUsed ?? null,
+        },
+      });
+
+      return insight.id;
+    } catch (error) {
+      logger.error(`Failed to save AI insight (${params.insightType})`, error instanceof Error ? error : undefined);
+      throw new DatabaseError(
+        "saveInsight",
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
+
+  /**
+   * Returns the most recent AI insight for a given type + scope (job/proposal/tenant).
+   * Returns null if no cached insight exists.
+   */
+  async getLatestInsight(params: {
+    tenantId: string;
+    insightType: InsightType;
+    jobId?: string | null;
+    proposalId?: string | null;
+  }): Promise<{ id: string; result: unknown; createdAt: Date } | null> {
+    try {
+      const whereClause: Record<string, unknown> = {
+        tenant_id: params.tenantId,
+        insight_type: params.insightType,
+      };
+
+      if (params.jobId) {
+        whereClause.job_id = params.jobId;
+      }
+      if (params.proposalId) {
+        whereClause.proposal_id = params.proposalId;
+      }
+      // For tenant-level insights (no jobId/proposalId), only filter by tenant+type
+      if (!params.jobId && !params.proposalId) {
+        whereClause.job_id = null;
+        whereClause.proposal_id = null;
+      }
+
+      const insight = await this.prisma.aiInsight.findFirst({
+        where: whereClause,
+        orderBy: { created_at: "desc" },
+        select: { id: true, result: true, created_at: true },
+      });
+
+      if (!insight) return null;
+
+      return {
+        id: insight.id,
+        result: insight.result,
+        createdAt: insight.created_at,
+      };
+    } catch (error) {
+      logger.error(`Failed to get latest AI insight (${params.insightType})`, error instanceof Error ? error : undefined);
+      throw new DatabaseError(
+        "getLatestInsight",
         error instanceof Error ? error : new Error(String(error))
       );
     }

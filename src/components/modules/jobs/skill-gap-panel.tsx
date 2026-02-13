@@ -5,7 +5,7 @@
  * Shows readiness level, specific gaps, and a learning plan.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -112,6 +112,18 @@ const resourceTypeIcons: Record<string, React.ReactNode> = {
 export function SkillGapPanel({ jobId }: SkillGapPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SkillGapData | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "SKILL_GAP", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as SkillGapData);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.skillGap.useMutation({
     onSuccess: (data) => {

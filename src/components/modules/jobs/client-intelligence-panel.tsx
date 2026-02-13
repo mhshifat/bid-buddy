@@ -5,7 +5,7 @@
  * Builds a comprehensive profile from the job's embedded client data.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -85,6 +85,18 @@ function getTrustBg(score: number): string {
 export function ClientIntelligencePanel({ jobId }: ClientIntelligencePanelProps) {
   const [result, setResult] = useState<ClientIntelligenceResult | null>(null);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "CLIENT_INTELLIGENCE", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as ClientIntelligenceResult);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.clientIntelligenceFromJob.useMutation({
     onSuccess: (data) => {

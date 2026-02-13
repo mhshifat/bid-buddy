@@ -5,7 +5,7 @@
  * client before committing. Uncovers hidden scope, risks, and expectations.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,6 +86,18 @@ export function DiscoveryQuestionsPanel({ jobId }: DiscoveryQuestionsPanelProps)
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DiscoveryData | null>(null);
   const [templateCopied, setTemplateCopied] = useState(false);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "DISCOVERY_QUESTIONS", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as DiscoveryData);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.discoveryQuestions.useMutation({
     onSuccess: (data) => {

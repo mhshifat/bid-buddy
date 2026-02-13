@@ -5,7 +5,7 @@
  * Helps freelancers prepare for client discovery calls.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +39,12 @@ interface InterviewQuestion {
   difficulty: "easy" | "medium" | "hard";
   suggestedAnswer: string;
   tips: string;
+}
+
+interface InterviewPrepData {
+  questions: InterviewQuestion[];
+  overallTips: string[];
+  communicationAdvice: string;
 }
 
 interface InterviewPrepPanelProps {
@@ -75,11 +81,19 @@ const difficultyColors: Record<string, string> = {
 
 export function InterviewPrepPanel({ jobId }: InterviewPrepPanelProps) {
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    questions: InterviewQuestion[];
-    overallTips: string[];
-    communicationAdvice: string;
-  } | null>(null);
+  const [result, setResult] = useState<InterviewPrepData | null>(null);
+
+  // Load cached result on mount
+  const { data: cached } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "INTERVIEW_PREP", jobId },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cached?.result && !result) {
+      setResult(cached.result as InterviewPrepData);
+    }
+  }, [cached, result]);
 
   const mutation = trpc.ai.interviewPrep.useMutation({
     onSuccess: (data) => {

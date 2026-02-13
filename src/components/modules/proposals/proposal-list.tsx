@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -162,6 +162,21 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
   const [copied, setCopied] = useState(false);
   const [followUp, setFollowUp] = useState<string | null>(null);
   const [showFollowUp, setShowFollowUp] = useState(false);
+
+  // Load cached follow-up on mount
+  const { data: cachedFollowUp } = trpc.ai.getCachedInsight.useQuery(
+    { insightType: "FOLLOW_UP_MESSAGE", proposalId: proposal.id },
+    { staleTime: Infinity, refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (cachedFollowUp?.result && !followUp) {
+      const cached = cachedFollowUp.result as { message?: string };
+      if (cached.message) {
+        setFollowUp(cached.message);
+      }
+    }
+  }, [cachedFollowUp, followUp]);
 
   const followUpMutation = trpc.ai.followUpMessage.useMutation({
     onSuccess: (data) => {
