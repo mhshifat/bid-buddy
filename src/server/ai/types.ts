@@ -239,3 +239,140 @@ export interface SkillGapResult {
   learningPlan: string;
 }
 
+// ---------------------------------------------------------------------------
+// Project Scope Estimator
+// ---------------------------------------------------------------------------
+
+export interface ScopeEstimatorInput {
+  jobTitle: string;
+  jobDescription: string;
+  jobType: string;
+  skillsRequired: string[];
+  budgetMin: number | null;
+  budgetMax: number | null;
+  hourlyRateMin: number | null;
+  hourlyRateMax: number | null;
+  estimatedDuration: string | null;
+  experienceLevel: string | null;
+}
+
+export interface ScopeTask {
+  name: string;
+  description: string;
+  category: "setup" | "development" | "design" | "testing" | "deployment" | "communication" | "other";
+  hoursMin: number;
+  hoursMax: number;
+  complexity: "low" | "medium" | "high";
+  dependencies: string[];
+  deliverable: string;
+}
+
+export interface ScopeMilestone {
+  name: string;
+  tasks: string[];
+  hoursEstimate: number;
+  suggestedPaymentPercent: number;
+  deliverables: string[];
+}
+
+export interface ScopeEstimatorResult {
+  tasks: ScopeTask[];
+  milestones: ScopeMilestone[];
+  totalHoursMin: number;
+  totalHoursMax: number;
+  riskBufferPercent: number;
+  adjustedHoursMin: number;
+  adjustedHoursMax: number;
+  suggestedFixedPrice: number | null;
+  suggestedHourlyRate: number | null;
+  scopeRisks: string[];
+  assumptions: string[];
+  outOfScopeItems: string[];
+  summary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Client Discovery Questions
+// ---------------------------------------------------------------------------
+
+export interface DiscoveryQuestionsInput {
+  jobTitle: string;
+  jobDescription: string;
+  jobType: string;
+  skillsRequired: string[];
+  budgetMin: number | null;
+  budgetMax: number | null;
+  estimatedDuration: string | null;
+  experienceLevel: string | null;
+  clientCountry: string | null;
+  clientTotalSpent: number | null;
+  clientTotalHires: number | null;
+  clientPaymentVerified: boolean;
+}
+
+export interface DiscoveryQuestion {
+  question: string;
+  category: "scope" | "timeline" | "budget" | "communication" | "technical" | "expectations" | "red-flag";
+  priority: "must-ask" | "should-ask" | "nice-to-ask";
+  whyItMatters: string;
+  idealAnswer: string;
+  redFlagAnswer: string;
+}
+
+export interface DiscoveryQuestionsResult {
+  questions: DiscoveryQuestion[];
+  messagingTips: string[];
+  dealBreakers: string[];
+  greenFlags: string[];
+  suggestedMessageTemplate: string;
+}
+
+// ---------------------------------------------------------------------------
+// Contract & Negotiation Advisor
+// ---------------------------------------------------------------------------
+
+export interface ContractAdvisorInput {
+  jobTitle: string;
+  jobDescription: string;
+  jobType: string;
+  skillsRequired: string[];
+  budgetMin: number | null;
+  budgetMax: number | null;
+  hourlyRateMin: number | null;
+  hourlyRateMax: number | null;
+  estimatedDuration: string | null;
+  experienceLevel: string | null;
+  clientCountry: string | null;
+  clientTotalSpent: number | null;
+  clientTotalHires: number | null;
+  clientHireRate: number | null;
+  clientPaymentVerified: boolean;
+  proposalsCount: number | null;
+}
+
+export interface NegotiationPoint {
+  topic: string;
+  currentRisk: "low" | "medium" | "high";
+  suggestion: string;
+  scriptExample: string;
+}
+
+export interface PaymentMilestone {
+  milestone: string;
+  percent: number;
+  trigger: string;
+}
+
+export interface ContractAdvisorResult {
+  overallRiskLevel: "low" | "medium" | "high";
+  riskSummary: string;
+  negotiationPoints: NegotiationPoint[];
+  paymentStructure: PaymentMilestone[];
+  scopeProtectionTips: string[];
+  revisionPolicy: string;
+  communicationTerms: string[];
+  walkAwaySignals: string[];
+  contractChecklist: string[];
+  upworkSpecificTips: string[];
+}
+

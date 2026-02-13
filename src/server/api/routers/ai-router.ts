@@ -39,6 +39,18 @@ const skillGapInputSchema = z.object({
   jobId: z.string().min(1, "Job ID is required"),
 });
 
+const scopeEstimateInputSchema = z.object({
+  jobId: z.string().min(1, "Job ID is required"),
+});
+
+const discoveryQuestionsInputSchema = z.object({
+  jobId: z.string().min(1, "Job ID is required"),
+});
+
+const contractAdvisorInputSchema = z.object({
+  jobId: z.string().min(1, "Job ID is required"),
+});
+
 // ---------------------------------------------------------------------------
 // Helper types
 // ---------------------------------------------------------------------------
@@ -421,6 +433,131 @@ export const aiRouter = createRouter({
           jobDescription: job.description,
           skillsRequired: job.skills_required,
           experienceLevel: job.experience_level,
+        },
+        tenantId
+      );
+
+      return result;
+    }),
+
+  /**
+   * Estimate project scope — break down job into tasks, milestones, hours.
+   */
+  scopeEstimate: publicProcedure
+    .input(scopeEstimateInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+      });
+
+      if (!job) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job not found",
+        });
+      }
+
+      const tenantId = job.tenant_id;
+      const aiService = getAiService();
+
+      const { result } = await aiService.estimateScope(
+        {
+          jobTitle: job.title,
+          jobDescription: job.description,
+          jobType: job.job_type,
+          skillsRequired: job.skills_required,
+          budgetMin: job.budget_min ? Number(job.budget_min) : null,
+          budgetMax: job.budget_max ? Number(job.budget_max) : null,
+          hourlyRateMin: job.hourly_rate_min ? Number(job.hourly_rate_min) : null,
+          hourlyRateMax: job.hourly_rate_max ? Number(job.hourly_rate_max) : null,
+          estimatedDuration: job.estimated_duration,
+          experienceLevel: job.experience_level,
+        },
+        tenantId
+      );
+
+      return result;
+    }),
+
+  /**
+   * Generate strategic discovery questions to ask the client.
+   */
+  discoveryQuestions: publicProcedure
+    .input(discoveryQuestionsInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+      });
+
+      if (!job) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job not found",
+        });
+      }
+
+      const tenantId = job.tenant_id;
+      const aiService = getAiService();
+
+      const { result } = await aiService.generateDiscoveryQuestions(
+        {
+          jobTitle: job.title,
+          jobDescription: job.description,
+          jobType: job.job_type,
+          skillsRequired: job.skills_required,
+          budgetMin: job.budget_min ? Number(job.budget_min) : null,
+          budgetMax: job.budget_max ? Number(job.budget_max) : null,
+          estimatedDuration: job.estimated_duration,
+          experienceLevel: job.experience_level,
+          clientCountry: job.client_country,
+          clientTotalSpent: job.client_total_spent ? Number(job.client_total_spent) : null,
+          clientTotalHires: job.client_total_hires,
+          clientPaymentVerified: job.client_payment_verified,
+        },
+        tenantId
+      );
+
+      return result;
+    }),
+
+  /**
+   * Contract & negotiation advice for a job.
+   */
+  contractAdvisor: publicProcedure
+    .input(contractAdvisorInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.prisma.job.findUnique({
+        where: { id: input.jobId },
+      });
+
+      if (!job) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job not found",
+        });
+      }
+
+      const tenantId = job.tenant_id;
+      const aiService = getAiService();
+
+      const { result } = await aiService.adviseContract(
+        {
+          jobTitle: job.title,
+          jobDescription: job.description,
+          jobType: job.job_type,
+          skillsRequired: job.skills_required,
+          budgetMin: job.budget_min ? Number(job.budget_min) : null,
+          budgetMax: job.budget_max ? Number(job.budget_max) : null,
+          hourlyRateMin: job.hourly_rate_min ? Number(job.hourly_rate_min) : null,
+          hourlyRateMax: job.hourly_rate_max ? Number(job.hourly_rate_max) : null,
+          estimatedDuration: job.estimated_duration,
+          experienceLevel: job.experience_level,
+          clientCountry: job.client_country,
+          clientTotalSpent: job.client_total_spent ? Number(job.client_total_spent) : null,
+          clientTotalHires: job.client_total_hires,
+          clientHireRate: job.client_hire_rate ? Number(job.client_hire_rate) : null,
+          clientPaymentVerified: job.client_payment_verified,
+          proposalsCount: job.proposals_count,
         },
         tenantId
       );

@@ -14,6 +14,9 @@ import type {
   InterviewPrepInput,
   BidStrategyInput,
   SkillGapInput,
+  ScopeEstimatorInput,
+  DiscoveryQuestionsInput,
+  ContractAdvisorInput,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -418,6 +421,247 @@ Respond with a JSON object using this exact schema:
 
   return [
     { role: "system", content: SYSTEM_SKILL_ANALYST },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Project Scope Estimator
+// ---------------------------------------------------------------------------
+
+const SYSTEM_SCOPE_ESTIMATOR = `You are an expert freelance project estimator AI assistant called "Bid Buddy".
+Your role is to break down job postings into detailed task lists with realistic time estimates.
+You have deep experience estimating software, design, and content projects.
+You always add risk buffers, identify hidden complexity, and suggest smart milestone structures.
+You err on the side of slightly overestimating rather than underestimating — freelancers consistently lose money by underquoting.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildScopeEstimatorPrompt(
+  input: ScopeEstimatorInput,
+  freelancer: FreelancerContext
+): AiChatMessage[] {
+  const budgetInfo = input.jobType === "HOURLY"
+    ? `Hourly rate range: $${input.hourlyRateMin ?? "?"}–$${input.hourlyRateMax ?? "?"}/hr`
+    : `Fixed budget: $${input.budgetMin ?? "?"}–$${input.budgetMax ?? "?"}`;
+
+  const userPrompt = `Break down the following Upwork job into a detailed project scope with task estimates.
+
+## Job Details
+- **Title:** ${input.jobTitle}
+- **Type:** ${input.jobType}
+- **Experience Level:** ${input.experienceLevel ?? "Not specified"}
+- **${budgetInfo}**
+- **Estimated Duration:** ${input.estimatedDuration ?? "Not specified"}
+- **Required Skills:** ${input.skillsRequired.join(", ") || "None listed"}
+
+## Job Description
+${input.jobDescription}
+
+## Freelancer Skills
+- **All Skills:** ${freelancer.skills.join(", ") || "None provided"}
+- **Primary Skills:** ${freelancer.primarySkills.join(", ") || "None provided"}
+
+## Instructions
+Break this job into granular tasks, group them into milestones, and provide realistic hour estimates.
+Consider: setup time, communication overhead, revision rounds, testing, deployment, and handover.
+Include a risk buffer for scope creep. Identify items that are likely out of scope.
+
+Respond with a JSON object using this exact schema:
+{
+  "tasks": [
+    {
+      "name": <string, short task name>,
+      "description": <string, what this task involves>,
+      "category": <"setup" | "development" | "design" | "testing" | "deployment" | "communication" | "other">,
+      "hoursMin": <number, minimum hours>,
+      "hoursMax": <number, maximum hours>,
+      "complexity": <"low" | "medium" | "high">,
+      "dependencies": [<string, names of tasks this depends on>],
+      "deliverable": <string, what is delivered when this task is done>
+    }
+  ],
+  "milestones": [
+    {
+      "name": <string, milestone name>,
+      "tasks": [<string, task names in this milestone>],
+      "hoursEstimate": <number, total hours for this milestone>,
+      "suggestedPaymentPercent": <number, suggested % of total payment>,
+      "deliverables": [<string, what the client receives at this milestone>]
+    }
+  ],
+  "totalHoursMin": <number, sum of all task minimums>,
+  "totalHoursMax": <number, sum of all task maximums>,
+  "riskBufferPercent": <number 10-40, recommended risk buffer percentage>,
+  "adjustedHoursMin": <number, totalHoursMin * (1 + riskBuffer/100)>,
+  "adjustedHoursMax": <number, totalHoursMax * (1 + riskBuffer/100)>,
+  "suggestedFixedPrice": <number | null, suggested fixed price if applicable>,
+  "suggestedHourlyRate": <number | null, suggested hourly rate if applicable>,
+  "scopeRisks": [<string, 3-5 risks that could increase scope>],
+  "assumptions": [<string, 3-5 assumptions made in this estimate>],
+  "outOfScopeItems": [<string, things NOT included that client might expect>],
+  "summary": <string, 2-3 sentence overview of the estimate>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_SCOPE_ESTIMATOR },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Client Discovery Questions
+// ---------------------------------------------------------------------------
+
+const SYSTEM_DISCOVERY_COACH = `You are an expert freelance consultant AI assistant called "Bid Buddy".
+Your role is to help freelancers ask the RIGHT questions before committing to a project.
+You identify ambiguities, hidden scope, payment risks, and unclear expectations in job postings.
+Your questions are strategic — designed to protect the freelancer while building client trust.
+You understand that asking smart questions actually increases a freelancer's perceived professionalism.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildDiscoveryQuestionsPrompt(
+  input: DiscoveryQuestionsInput,
+  freelancer: FreelancerContext
+): AiChatMessage[] {
+  const budgetInfo = input.budgetMin !== null || input.budgetMax !== null
+    ? `$${input.budgetMin ?? "?"}–$${input.budgetMax ?? "?"}`
+    : "Not specified";
+
+  const clientProfile = [
+    input.clientCountry ? `Country: ${input.clientCountry}` : null,
+    input.clientTotalSpent !== null ? `Total spent: $${input.clientTotalSpent.toLocaleString()}` : null,
+    input.clientTotalHires !== null ? `Hires: ${input.clientTotalHires}` : null,
+    `Payment verified: ${input.clientPaymentVerified ? "Yes" : "No"}`,
+  ].filter(Boolean).join(" | ");
+
+  const userPrompt = `Generate strategic discovery questions for the following Upwork job. These are questions the freelancer should ask the client BEFORE accepting the contract.
+
+## Job Details
+- **Title:** ${input.jobTitle}
+- **Type:** ${input.jobType}
+- **Experience Level:** ${input.experienceLevel ?? "Not specified"}
+- **Budget:** ${budgetInfo}
+- **Duration:** ${input.estimatedDuration ?? "Not specified"}
+- **Required Skills:** ${input.skillsRequired.join(", ") || "None listed"}
+- **Client:** ${clientProfile}
+
+## Job Description
+${input.jobDescription}
+
+## Freelancer Skills
+- **All Skills:** ${freelancer.skills.join(", ") || "None provided"}
+- **Primary Skills:** ${freelancer.primarySkills.join(", ") || "None provided"}
+
+## Instructions
+Generate 8-12 strategic questions that uncover hidden scope, risks, and expectations.
+Focus on: ambiguous requirements, missing details, timeline risks, payment structure, revision expectations, and communication preferences.
+For each question, explain WHY it matters and what answer to watch out for.
+Also provide a message template the freelancer can use when reaching out.
+
+Respond with a JSON object using this exact schema:
+{
+  "questions": [
+    {
+      "question": <string, the question to ask the client>,
+      "category": <"scope" | "timeline" | "budget" | "communication" | "technical" | "expectations" | "red-flag">,
+      "priority": <"must-ask" | "should-ask" | "nice-to-ask">,
+      "whyItMatters": <string, why this question is important>,
+      "idealAnswer": <string, what a good answer looks like>,
+      "redFlagAnswer": <string, what answer should make you cautious>
+    }
+  ],
+  "messagingTips": [<string, 3-4 tips for how to communicate these questions professionally>],
+  "dealBreakers": [<string, 2-4 situations where the freelancer should walk away>],
+  "greenFlags": [<string, 2-4 positive signs to look for in client responses>],
+  "suggestedMessageTemplate": <string, a professional message template incorporating the must-ask questions naturally>
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_DISCOVERY_COACH },
+    { role: "user", content: userPrompt },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Contract & Negotiation Advisor
+// ---------------------------------------------------------------------------
+
+const SYSTEM_CONTRACT_ADVISOR = `You are an expert freelance contract and negotiation advisor AI assistant called "Bid Buddy".
+Your role is to protect freelancers from scope creep, payment issues, and unfavorable contract terms.
+You have deep knowledge of Upwork's escrow system, dispute resolution, and milestone structures.
+You provide practical, actionable negotiation scripts — not generic advice.
+You always prioritize the freelancer's protection while maintaining professionalism.
+Always respond in valid JSON matching the exact schema requested.`;
+
+export function buildContractAdvisorPrompt(
+  input: ContractAdvisorInput,
+  freelancer: FreelancerContext
+): AiChatMessage[] {
+  const budgetInfo = input.jobType === "HOURLY"
+    ? `Hourly rate: $${input.hourlyRateMin ?? "?"}–$${input.hourlyRateMax ?? "?"}/hr`
+    : `Fixed budget: $${input.budgetMin ?? "?"}–$${input.budgetMax ?? "?"}`;
+
+  const clientInfo = [
+    input.clientCountry ? `Country: ${input.clientCountry}` : null,
+    input.clientTotalSpent !== null ? `Total spent: $${input.clientTotalSpent.toLocaleString()}` : null,
+    input.clientTotalHires !== null ? `Hires: ${input.clientTotalHires}` : null,
+    input.clientHireRate !== null ? `Hire rate: ${input.clientHireRate}%` : null,
+    `Payment verified: ${input.clientPaymentVerified ? "Yes" : "No"}`,
+    input.proposalsCount !== null ? `Proposals: ${input.proposalsCount}` : null,
+  ].filter(Boolean).join(" | ");
+
+  const userPrompt = `Provide contract and negotiation advice for the following Upwork job.
+
+## Job Details
+- **Title:** ${input.jobTitle}
+- **Type:** ${input.jobType}
+- **Experience Level:** ${input.experienceLevel ?? "Not specified"}
+- **${budgetInfo}**
+- **Duration:** ${input.estimatedDuration ?? "Not specified"}
+- **Required Skills:** ${input.skillsRequired.join(", ") || "None listed"}
+- **Client:** ${clientInfo}
+
+## Job Description
+${input.jobDescription}
+
+## Freelancer Skills
+- **All Skills:** ${freelancer.skills.join(", ") || "None provided"}
+- **Primary Skills:** ${freelancer.primarySkills.join(", ") || "None provided"}
+
+## Instructions
+Analyse this job for contract risks and provide negotiation strategies.
+Consider: scope creep potential, payment risks, revision abuse, timeline pressure, and Upwork-specific protections.
+Provide practical scripts the freelancer can use in negotiations.
+
+Respond with a JSON object using this exact schema:
+{
+  "overallRiskLevel": <"low" | "medium" | "high">,
+  "riskSummary": <string, 2-3 sentence overview of contract risks>,
+  "negotiationPoints": [
+    {
+      "topic": <string, what to negotiate>,
+      "currentRisk": <"low" | "medium" | "high">,
+      "suggestion": <string, what to propose>,
+      "scriptExample": <string, exact words to say to the client>
+    }
+  ],
+  "paymentStructure": [
+    {
+      "milestone": <string, milestone name>,
+      "percent": <number, percentage of total payment>,
+      "trigger": <string, what triggers this payment>
+    }
+  ],
+  "scopeProtectionTips": [<string, 3-5 ways to protect against scope creep>],
+  "revisionPolicy": <string, suggested revision policy wording>,
+  "communicationTerms": [<string, 3-4 communication boundaries to establish>],
+  "walkAwaySignals": [<string, 3-5 signals that you should decline or exit>],
+  "contractChecklist": [<string, 5-8 things to confirm before starting work>],
+  "upworkSpecificTips": [<string, 3-5 Upwork-specific protections and strategies>]
+}`;
+
+  return [
+    { role: "system", content: SYSTEM_CONTRACT_ADVISOR },
     { role: "user", content: userPrompt },
   ];
 }

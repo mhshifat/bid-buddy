@@ -17,6 +17,9 @@ import {
   buildInterviewPrepPrompt,
   buildBidStrategyPrompt,
   buildSkillGapPrompt,
+  buildScopeEstimatorPrompt,
+  buildDiscoveryQuestionsPrompt,
+  buildContractAdvisorPrompt,
 } from "./prompts";
 import type {
   JobAnalysisInput,
@@ -32,6 +35,12 @@ import type {
   BidStrategyResult,
   SkillGapInput,
   SkillGapResult,
+  ScopeEstimatorInput,
+  ScopeEstimatorResult,
+  DiscoveryQuestionsInput,
+  DiscoveryQuestionsResult,
+  ContractAdvisorInput,
+  ContractAdvisorResult,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -398,6 +407,144 @@ export class AiService {
     const duration = Date.now() - startTime;
     logger.info(
       `Skill gap analysis complete for "${input.jobTitle}" in ${duration}ms — readiness: ${result.overallReadiness}%`,
+      { tokensUsed: String(completion.tokensUsed) }
+    );
+
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Project Scope Estimator
+  // -----------------------------------------------------------------------
+
+  /**
+   * Breaks down a job into tasks, milestones, and hour estimates.
+   */
+  async estimateScope(
+    input: ScopeEstimatorInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: ScopeEstimatorResult }> {
+    const startTime = Date.now();
+
+    logger.info(`Starting scope estimate for "${input.jobTitle}"`, {
+      tenantId,
+      provider: this.provider.name,
+    });
+
+    const freelancer =
+      freelancerOverride ??
+      (await this.repository.getFreelancerSkills(tenantId));
+
+    const messages = buildScopeEstimatorPrompt(input, freelancer);
+
+    const completion = await this.provider.complete({
+      model: this.provider.defaultModel,
+      messages,
+      temperature: 0.4,
+      jsonMode: true,
+    });
+
+    const result = safeParseJson<ScopeEstimatorResult>(
+      completion.content,
+      "scope_estimator"
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info(
+      `Scope estimate complete for "${input.jobTitle}" in ${duration}ms — ${result.tasks.length} tasks, ${result.totalHoursMin}-${result.totalHoursMax}h`,
+      { tokensUsed: String(completion.tokensUsed) }
+    );
+
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Client Discovery Questions
+  // -----------------------------------------------------------------------
+
+  /**
+   * Generates strategic pre-contract questions to uncover risks and clarify scope.
+   */
+  async generateDiscoveryQuestions(
+    input: DiscoveryQuestionsInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: DiscoveryQuestionsResult }> {
+    const startTime = Date.now();
+
+    logger.info(`Starting discovery questions for "${input.jobTitle}"`, {
+      tenantId,
+      provider: this.provider.name,
+    });
+
+    const freelancer =
+      freelancerOverride ??
+      (await this.repository.getFreelancerSkills(tenantId));
+
+    const messages = buildDiscoveryQuestionsPrompt(input, freelancer);
+
+    const completion = await this.provider.complete({
+      model: this.provider.defaultModel,
+      messages,
+      temperature: 0.5,
+      jsonMode: true,
+    });
+
+    const result = safeParseJson<DiscoveryQuestionsResult>(
+      completion.content,
+      "discovery_questions"
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info(
+      `Discovery questions complete for "${input.jobTitle}" in ${duration}ms — ${result.questions.length} questions`,
+      { tokensUsed: String(completion.tokensUsed) }
+    );
+
+    return { result };
+  }
+
+  // -----------------------------------------------------------------------
+  // Contract & Negotiation Advisor
+  // -----------------------------------------------------------------------
+
+  /**
+   * Analyses contract risks and provides negotiation strategies.
+   */
+  async adviseContract(
+    input: ContractAdvisorInput,
+    tenantId: string,
+    freelancerOverride?: FreelancerContext
+  ): Promise<{ result: ContractAdvisorResult }> {
+    const startTime = Date.now();
+
+    logger.info(`Starting contract advice for "${input.jobTitle}"`, {
+      tenantId,
+      provider: this.provider.name,
+    });
+
+    const freelancer =
+      freelancerOverride ??
+      (await this.repository.getFreelancerSkills(tenantId));
+
+    const messages = buildContractAdvisorPrompt(input, freelancer);
+
+    const completion = await this.provider.complete({
+      model: this.provider.defaultModel,
+      messages,
+      temperature: 0.4,
+      jsonMode: true,
+    });
+
+    const result = safeParseJson<ContractAdvisorResult>(
+      completion.content,
+      "contract_advisor"
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info(
+      `Contract advice complete for "${input.jobTitle}" in ${duration}ms — risk: ${result.overallRiskLevel}`,
       { tokensUsed: String(completion.tokensUsed) }
     );
 

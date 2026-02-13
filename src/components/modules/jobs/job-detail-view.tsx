@@ -36,6 +36,9 @@ import {
   MessageSquare,
   Target,
   BookOpen,
+  ListChecks,
+  HelpCircle,
+  Scale,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -46,6 +49,9 @@ import { ClientAnalysisButton } from "./client-analysis-button";
 import { InterviewPrepPanel } from "./interview-prep-panel";
 import { BidStrategyPanel } from "./bid-strategy-panel";
 import { SkillGapPanel } from "./skill-gap-panel";
+import { ScopeEstimatorPanel } from "./scope-estimator-panel";
+import { DiscoveryQuestionsPanel } from "./discovery-questions-panel";
+import { ContractAdvisorPanel } from "./contract-advisor-panel";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
@@ -233,6 +239,18 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
                 <BookOpen className="mr-1 h-3.5 w-3.5" />
                 Skill Gap
               </TabsTrigger>
+              <TabsTrigger value="scope">
+                <ListChecks className="mr-1 h-3.5 w-3.5" />
+                Scope
+              </TabsTrigger>
+              <TabsTrigger value="discovery">
+                <HelpCircle className="mr-1 h-3.5 w-3.5" />
+                Discovery
+              </TabsTrigger>
+              <TabsTrigger value="contract">
+                <Scale className="mr-1 h-3.5 w-3.5" />
+                Contract
+              </TabsTrigger>
               <TabsTrigger value="notes">
                 Notes ({job.notes.length})
               </TabsTrigger>
@@ -303,6 +321,21 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
             {/* Skill Gap Tab */}
             <TabsContent value="skillgap" className="mt-4">
               <SkillGapPanel jobId={jobId} />
+            </TabsContent>
+
+            {/* Scope Estimator Tab */}
+            <TabsContent value="scope" className="mt-4">
+              <ScopeEstimatorPanel jobId={jobId} />
+            </TabsContent>
+
+            {/* Discovery Questions Tab */}
+            <TabsContent value="discovery" className="mt-4">
+              <DiscoveryQuestionsPanel jobId={jobId} />
+            </TabsContent>
+
+            {/* Contract Advisor Tab */}
+            <TabsContent value="contract" className="mt-4">
+              <ContractAdvisorPanel jobId={jobId} />
             </TabsContent>
 
             {/* Notes Tab */}
@@ -544,6 +577,42 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
                   >
                     <BookOpen className="mr-2 h-3.5 w-3.5" />
                     Skill Gap Analysis
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="scope"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <ListChecks className="mr-2 h-3.5 w-3.5" />
+                    Scope Estimator
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="discovery"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <HelpCircle className="mr-2 h-3.5 w-3.5" />
+                    Discovery Questions
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-xs"
+                    size="sm"
+                    onClick={() => {
+                      const el = document.querySelector('[data-value="contract"]') as HTMLButtonElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <Scale className="mr-2 h-3.5 w-3.5" />
+                    Contract Advisor
                   </Button>
                 </div>
               </div>
