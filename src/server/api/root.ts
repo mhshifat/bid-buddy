@@ -11,6 +11,7 @@ import { clientRouter } from "./routers/client-router";
 import { dashboardRouter } from "./routers/dashboard-router";
 import { skillRouter } from "./routers/skill-router";
 import { aiRouter } from "./routers/ai-router";
+import { githubRouter } from "./routers/github-router";
 
 export const appRouter = createRouter({
   auth: authRouter,
@@ -21,6 +22,7 @@ export const appRouter = createRouter({
   dashboard: dashboardRouter,
   skill: skillRouter,
   ai: aiRouter,
+  github: githubRouter,
 });
 
 export type AppRouter = typeof appRouter;
