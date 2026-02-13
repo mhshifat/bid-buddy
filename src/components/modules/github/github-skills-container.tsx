@@ -18,7 +18,7 @@ import { GitHubConnectCard } from "./github-connect-card";
 import { GitHubProfileCard } from "./github-profile-card";
 import { GitHubLanguagesCard } from "./github-languages-card";
 import { GitHubReposCard } from "./github-repos-card";
-import { GitHubSkillsDetected } from "./github-skills-detected";
+import { SkillsManager } from "./skills-manager";
 
 export function GitHubSkillsContainer() {
   const utils = trpc.useUtils();
@@ -113,10 +113,10 @@ export function GitHubSkillsContainer() {
         {profile && (
           <GitHubLanguagesCard topLanguages={profile.topLanguages} />
         )}
-        <GitHubSkillsDetected />
+        {profile && <GitHubReposCard topRepos={profile.topRepos} />}
       </div>
 
-      {profile && <GitHubReposCard topRepos={profile.topRepos} />}
+      <SkillsManager />
     </div>
   );
 }
