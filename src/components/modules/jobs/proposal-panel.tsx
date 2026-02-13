@@ -30,6 +30,8 @@ import {
   Clock,
   Lightbulb,
   HelpCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -42,7 +44,9 @@ import { toast } from "sonner";
 interface ProposalData {
   id: string;
   status: string;
+  coverLetter: string;
   proposedRate: number | null;
+  proposedDuration: string | null;
   aiGenerated: boolean;
   createdAt: Date;
 }
@@ -140,7 +144,7 @@ export function ProposalPanel({
   }
 
   // -------------------------------------------------------------------------
-  // Show generated result
+  // Show generated result (freshly generated, with extra AI context)
   // -------------------------------------------------------------------------
   if (generatedContent) {
     return (
@@ -152,6 +156,9 @@ export function ProposalPanel({
         {proposals.length > 0 && (
           <>
             <Separator />
+            <p className="text-sm font-medium text-muted-foreground">
+              Previous Proposals
+            </p>
             <ProposalsList proposals={proposals} />
           </>
         )}
@@ -334,36 +341,115 @@ function GeneratedProposalView({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Saved Proposals List — shows full cover letter with expand/collapse
+// ---------------------------------------------------------------------------
+
 function ProposalsList({ proposals }: { proposals: ProposalData[] }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {proposals.map((p) => (
-        <Card key={p.id}>
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px]">
-                    {p.status}
-                  </Badge>
-                  {p.aiGenerated && (
-                    <Badge variant="outline" className="text-[10px]">
-                      <Sparkles className="mr-1 h-2.5 w-2.5" />
-                      AI
-                    </Badge>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {new Date(p.createdAt).toLocaleDateString()}
-                  {p.proposedRate !== null && ` · $${p.proposedRate}`}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <SavedProposalCard key={p.id} proposal={p} />
       ))}
     </div>
   );
 }
 
+function SavedProposalCard({ proposal }: { proposal: ProposalData }) {
+  const [expanded, setExpanded] = useState(proposals_shouldAutoExpand(proposal));
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(proposal.coverLetter);
+    setCopied(true);
+    toast.success("Cover letter copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
+  }, [proposal.coverLetter]);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <Badge variant="secondary" className="text-[10px]">
+              {proposal.status}
+            </Badge>
+            {proposal.aiGenerated && (
+              <Badge variant="outline" className="text-[10px]">
+                <Sparkles className="mr-1 h-2.5 w-2.5" />
+                AI
+              </Badge>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {new Date(proposal.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {(proposal.proposedRate !== null || proposal.proposedDuration) && (
+              <div className="flex items-center gap-2 mr-2">
+                {proposal.proposedRate !== null && (
+                  <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                    <DollarSign className="h-3 w-3" />
+                    {proposal.proposedRate}
+                  </span>
+                )}
+                {proposal.proposedDuration && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {proposal.proposedDuration}
+                  </span>
+                )}
+              </div>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCopy}>
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copy cover letter</TooltipContent>
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="pt-0">
+          <Separator className="mb-3" />
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {proposal.coverLetter}
+          </p>
+        </CardContent>
+      )}
+      {!expanded && (
+        <CardContent className="pt-0">
+          <p className="text-xs text-muted-foreground line-clamp-2">
+            {proposal.coverLetter}
+          </p>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+/** Auto-expand the first / most recent proposal for convenience. */
+function proposals_shouldAutoExpand(proposal: ProposalData): boolean {
+  // Auto-expand DRAFT proposals (most recently generated)
+  return proposal.status === "DRAFT";
+}

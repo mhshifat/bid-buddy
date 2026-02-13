@@ -325,7 +325,9 @@ export const jobRouter = createRouter({
         proposals: typedJob.proposals.map((p: Proposal) => ({
           id: p.id,
           status: p.status,
+          coverLetter: p.cover_letter,
           proposedRate: p.proposed_rate ? Number(p.proposed_rate) : null,
+          proposedDuration: p.proposed_duration,
           aiGenerated: p.ai_generated,
           createdAt: p.created_at,
         })),

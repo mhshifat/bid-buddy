@@ -79,10 +79,7 @@ export const proposalRouter = createRouter({
           jobTitle: p.job.title,
           jobType: p.job.job_type,
           jobStatus: p.job.status,
-          coverLetter:
-            p.cover_letter.length > 150
-              ? `${p.cover_letter.substring(0, 150)}...`
-              : p.cover_letter,
+          coverLetter: p.cover_letter,
           proposedRate: p.proposed_rate ? Number(p.proposed_rate) : null,
           proposedDuration: p.proposed_duration,
           connectsUsed: p.connects_used,

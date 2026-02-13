@@ -2,10 +2,31 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import {
+  FileText,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  DollarSign,
+  Clock,
+  ExternalLink,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -17,6 +38,7 @@ import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PaginationControls } from "@/components/shared/pagination-controls";
+import { toast } from "sonner";
 
 const proposalStatusColors: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -29,6 +51,22 @@ const proposalStatusColors: Record<string, string> = {
   REJECTED: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
   WITHDRAWN: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
+
+interface ProposalItem {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  jobType: string;
+  jobStatus: string;
+  coverLetter: string;
+  proposedRate: number | null;
+  proposedDuration: string | null;
+  connectsUsed: number | null;
+  status: string;
+  aiGenerated: boolean;
+  sentAt: Date | null;
+  createdAt: Date;
+}
 
 export function ProposalList() {
   const [page, setPage] = useState(1);
@@ -87,53 +125,13 @@ export function ProposalList() {
         <EmptyState
           icon={FileText}
           title="No proposals found"
-          description="Create a proposal for a job to get started."
+          description="Generate an AI proposal from a job page to get started."
         />
       ) : (
         <>
           <div className="space-y-3">
             {data.items.map((proposal) => (
-              <Card key={proposal.id} className="transition-all hover:shadow-md">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/jobs/${proposal.jobId}`}
-                          className="text-sm font-semibold hover:underline"
-                        >
-                          {proposal.jobTitle}
-                        </Link>
-                        <Badge
-                          variant="secondary"
-                          className={`text-[10px] ${proposalStatusColors[proposal.status] ?? ""}`}
-                        >
-                          {proposal.status}
-                        </Badge>
-                        {proposal.aiGenerated && (
-                          <Badge variant="outline" className="text-[10px]">
-                            AI Generated
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {proposal.coverLetter}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {proposal.proposedRate !== null && (
-                          <span>${proposal.proposedRate}/hr</span>
-                        )}
-                        {proposal.connectsUsed !== null && (
-                          <span>{proposal.connectsUsed} connects</span>
-                        )}
-                        <span>
-                          {new Date(proposal.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <ProposalCard key={proposal.id} proposal={proposal as ProposalItem} />
             ))}
           </div>
 
@@ -153,6 +151,118 @@ export function ProposalList() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Proposal Card with expand/collapse
+// ---------------------------------------------------------------------------
+
+function ProposalCard({ proposal }: { proposal: ProposalItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(proposal.coverLetter);
+    setCopied(true);
+    toast.success("Cover letter copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
+  }, [proposal.coverLetter]);
+
+  return (
+    <Card className="transition-all hover:shadow-md">
+      <CardHeader className="pb-2 px-4 pt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href={`/jobs/${proposal.jobId}`}
+                className="text-sm font-semibold hover:underline flex items-center gap-1"
+              >
+                {proposal.jobTitle}
+                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+              </Link>
+              <Badge
+                variant="secondary"
+                className={`text-[10px] ${proposalStatusColors[proposal.status] ?? ""}`}
+              >
+                {proposal.status}
+              </Badge>
+              {proposal.aiGenerated && (
+                <Badge variant="outline" className="text-[10px]">
+                  <Sparkles className="mr-1 h-2.5 w-2.5" />
+                  AI
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {proposal.proposedRate !== null && (
+                <span className="flex items-center gap-1 font-medium text-emerald-600">
+                  <DollarSign className="h-3 w-3" />
+                  {proposal.proposedRate}
+                </span>
+              )}
+              {proposal.proposedDuration && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {proposal.proposedDuration}
+                </span>
+              )}
+              {proposal.connectsUsed !== null && (
+                <span>{proposal.connectsUsed} connects</span>
+              )}
+              <span>
+                {new Date(proposal.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCopy}>
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copy cover letter</TooltipContent>
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 pt-0">
+        {expanded ? (
+          <>
+            <Separator className="mb-3" />
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {proposal.coverLetter}
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground line-clamp-2">
+            {proposal.coverLetter}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton
+// ---------------------------------------------------------------------------
+
 function ProposalListSkeleton() {
   return (
     <div className="space-y-4">
@@ -170,4 +280,3 @@ function ProposalListSkeleton() {
     </div>
   );
 }
-
