@@ -3,8 +3,10 @@
  */
 
 import { z } from "zod";
-import type { Proposal, Job } from "@prisma/client";
+import type { PrismaClient, Proposal, Job } from "@prisma/client";
 import { createRouter, publicProcedure } from "../trpc";
+import { eventBus } from "@/server/events";
+import { JourneyService } from "@/server/journey/journey-service";
 
 const proposalFilterSchema = z.object({
   page: z.number().min(1).default(1),
@@ -146,6 +148,68 @@ export const proposalRouter = createRouter({
         respondedAt: p.responded_at,
         createdAt: p.created_at,
       };
+    }),
+
+  updateStatus: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        status: z.enum([
+          "DRAFT",
+          "REVIEW",
+          "READY",
+          "SENT",
+          "VIEWED",
+          "SHORTLISTED",
+          "ACCEPTED",
+          "REJECTED",
+          "WITHDRAWN",
+        ]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.proposal.findUnique({
+        where: { id: input.id },
+        include: {
+          job: { select: { id: true, title: true } },
+        },
+      });
+
+      if (!existing) {
+        throw new Error("Proposal not found");
+      }
+
+      await ctx.prisma.proposal.update({
+        where: { id: input.id },
+        data: {
+          status: input.status,
+          ...(input.status === "SENT" && !existing.sent_at
+            ? { sent_at: new Date() }
+            : {}),
+        },
+      });
+
+      // Emit real-time event
+      eventBus.emit("proposal:statusChanged", {
+        proposalId: input.id,
+        jobId: existing.job_id,
+        jobTitle: existing.job.title,
+        previousStatus: existing.status,
+        newStatus: input.status,
+      }, existing.tenant_id);
+
+      // Journey tracking: auto-advance job status + log activity
+      const journeyService = new JourneyService(ctx.prisma as unknown as PrismaClient);
+      await journeyService.onProposalStatusChanged({
+        tenantId: existing.tenant_id,
+        proposalId: input.id,
+        jobId: existing.job_id,
+        oldStatus: existing.status,
+        newStatus: input.status,
+        jobTitle: existing.job.title,
+      });
+
+      return { success: true };
     }),
 
   stats: publicProcedure.query(async ({ ctx }) => {

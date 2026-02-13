@@ -3,10 +3,11 @@
  */
 
 import { z } from "zod";
-import type { Job, AiAnalysis, Proposal, JobTag, JobNote } from "@prisma/client";
+import type { PrismaClient, Job, AiAnalysis, Proposal, JobTag, JobNote } from "@prisma/client";
 import { createRouter, publicProcedure } from "../trpc";
 import { eventBus } from "@/server/events";
 import { logger } from "@/server/lib/logger";
+import { JourneyService } from "@/server/journey/journey-service";
 import type { TrpcContext } from "../trpc";
 
 // ============================================================================
@@ -413,6 +414,15 @@ export const jobRouter = createRouter({
         capturedAt: job.captured_at.toISOString(),
       }, tenantId);
 
+      // Log journey: job discovered
+      const journeyService = new JourneyService(ctx.prisma as unknown as PrismaClient);
+      await journeyService.onJobCaptured({
+        tenantId,
+        jobId: job.id,
+        jobTitle: job.title,
+        source: "Upwork",
+      });
+
       return { id: job.id };
     }),
 
@@ -458,6 +468,16 @@ export const jobRouter = createRouter({
           previousStatus: existingJob.status,
           newStatus: input.status,
         }, existingJob.tenant_id);
+
+        // Log journey activity
+        const journeyService = new JourneyService(ctx.prisma as unknown as PrismaClient);
+        await journeyService.onJobStatusChanged({
+          tenantId: existingJob.tenant_id,
+          jobId: input.id,
+          oldStatus: existingJob.status,
+          newStatus: input.status,
+          jobTitle: existingJob.title,
+        });
       }
 
       return { success: true };

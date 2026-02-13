@@ -17,6 +17,7 @@ import {
   Zap,
   TrendingUp,
   Shield,
+  Route,
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,11 @@ const mainNavItems = [
     label: "Jobs",
     href: "/jobs",
     icon: Briefcase,
+  },
+  {
+    label: "Pipeline",
+    href: "/pipeline",
+    icon: Route,
   },
   {
     label: "Proposals",

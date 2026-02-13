@@ -34,6 +34,7 @@ model Tenant {
   templates        ProposalTemplate[]
   project_scopes   ProjectScope[]
   scope_change_requests ScopeChangeRequest[]
+  job_activities   JobActivity[]
 
   @@map("tenants")
 }
@@ -220,6 +221,8 @@ model Job {
   notes         JobNote[]
   ai_insights   AiInsight[]
   scopes        ProjectScope[]
+  projects      Project[]    @relation("ProjectOriginJob")
+  activities    JobActivity[]
 
   @@unique([tenant_id, upwork_job_id])
   @@index([tenant_id, status])
@@ -341,6 +344,7 @@ model Proposal {
   job         Job         @relation(fields: [job_id], references: [id], onDelete: Cascade)
   user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
   ai_insights AiInsight[]
+  projects    Project[]   @relation("ProjectWinningProposal")
 
   @@index([tenant_id, status])
   @@index([job_id])
@@ -382,6 +386,8 @@ model Project {
   id                  String        @id @default(cuid())
   tenant_id           String
   client_id           String
+  job_id              String?
+  proposal_id         String?
   title               String
   description         String?
   upwork_contract_id  String?
@@ -402,16 +408,20 @@ model Project {
   created_at          DateTime      @default(now())
   updated_at          DateTime      @updatedAt
 
-  tenant     Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  client     Client          @relation(fields: [client_id], references: [id], onDelete: Cascade)
-  members    ProjectMember[]
-  milestones Milestone[]
-  tasks      Task[]
-  time_logs  TimeLog[]
-  scopes     ProjectScope[]
+  tenant          Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  client          Client          @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  originating_job Job?            @relation("ProjectOriginJob", fields: [job_id], references: [id], onDelete: SetNull)
+  winning_proposal Proposal?      @relation("ProjectWinningProposal", fields: [proposal_id], references: [id], onDelete: SetNull)
+  members         ProjectMember[]
+  milestones      Milestone[]
+  tasks           Task[]
+  time_logs       TimeLog[]
+  scopes          ProjectScope[]
 
   @@index([tenant_id, status])
   @@index([client_id])
+  @@index([job_id])
+  @@index([proposal_id])
   @@map("projects")
 }
 
@@ -755,4 +765,49 @@ model ActivityLog {
   @@index([user_id])
   @@index([correlation_id])
   @@map("activity_logs")
+}
+
+// ============================================================================
+// Job Journey Tracking
+// ============================================================================
+
+enum JourneyPhase {
+  DISCOVERED
+  ANALYZED
+  SHORTLISTED
+  PROPOSAL_DRAFTED
+  PROPOSAL_SENT
+  INTERVIEWING
+  OFFER_RECEIVED
+  WON
+  PROJECT_STARTED
+  MILESTONE_COMPLETED
+  PROJECT_DELIVERED
+  PAYMENT_RECEIVED
+  FEEDBACK_RECEIVED
+  LOST
+  SKIPPED
+  EXPIRED
+}
+
+model JobActivity {
+  id           String       @id @default(cuid())
+  tenant_id    String
+  job_id       String
+  proposal_id  String?
+  project_id   String?
+  phase        JourneyPhase
+  title        String
+  description  String?
+  metadata     Json?
+  created_at   DateTime     @default(now())
+
+  tenant  Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  job     Job      @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([job_id])
+  @@index([tenant_id, phase])
+  @@index([created_at])
+  @@map("job_activities")
 }

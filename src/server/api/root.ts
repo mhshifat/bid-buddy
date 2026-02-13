@@ -13,6 +13,7 @@ import { skillRouter } from "./routers/skill-router";
 import { aiRouter } from "./routers/ai-router";
 import { githubRouter } from "./routers/github-router";
 import { scopeRouter } from "./routers/scope-router";
+import { pipelineRouter } from "./routers/pipeline-router";
 
 export const appRouter = createRouter({
   auth: authRouter,
@@ -25,6 +26,7 @@ export const appRouter = createRouter({
   ai: aiRouter,
   github: githubRouter,
   scope: scopeRouter,
+  pipeline: pipelineRouter,
 });
 
 export type AppRouter = typeof appRouter;

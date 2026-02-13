@@ -40,6 +40,8 @@ import {
   HelpCircle,
   Scale,
   Users,
+  Activity,
+  Rocket,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -55,6 +57,8 @@ import { DiscoveryQuestionsPanel } from "./discovery-questions-panel";
 import { ContractAdvisorPanel } from "./contract-advisor-panel";
 import { ProposalVariationsPanel } from "./proposal-variations-panel";
 import { ClientIntelligencePanel } from "./client-intelligence-panel";
+import { JobTimeline } from "@/components/modules/pipeline/job-timeline";
+import { ConvertToProjectDialog } from "@/components/modules/pipeline/convert-to-project-dialog";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
@@ -262,6 +266,10 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
                 <Users className="mr-1 h-3.5 w-3.5" />
                 Client Intel
               </TabsTrigger>
+              <TabsTrigger value="timeline">
+                <Activity className="mr-1 h-3.5 w-3.5" />
+                Timeline
+              </TabsTrigger>
               <TabsTrigger value="notes">
                 Notes ({job.notes.length})
               </TabsTrigger>
@@ -364,6 +372,28 @@ export function JobDetailView({ jobId }: JobDetailViewProps) {
             </TabsContent>
 
             {/* Notes Tab */}
+            {/* Timeline Tab */}
+            <TabsContent value="timeline" className="mt-4">
+              <div className="space-y-4">
+                <JobTimeline jobId={jobId} />
+                {(job.status === "ACCEPTED" || job.status === "INTERVIEWING") && (
+                  <ConvertToProjectDialog
+                    jobId={jobId}
+                    jobTitle={job.title}
+                    jobDescription={job.description}
+                    budgetMax={job.budgetMax}
+                    hourlyRate={job.hourlyRateMax}
+                    proposalId={job.proposals[0]?.id ?? null}
+                  >
+                    <Button className="w-full">
+                      <Rocket className="mr-2 h-4 w-4" />
+                      Convert to Project
+                    </Button>
+                  </ConvertToProjectDialog>
+                )}
+              </div>
+            </TabsContent>
+
             <TabsContent value="notes" className="mt-4">
               {job.notes.length === 0 ? (
                 <Card>
