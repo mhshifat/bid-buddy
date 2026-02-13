@@ -1,0 +1,643 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// Multi-tenant Support
+// ============================================================================
+
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  users            User[]
+  upwork_profiles  UpworkProfile[]
+  jobs             Job[]
+  proposals        Proposal[]
+  projects         Project[]
+  clients          Client[]
+  github_profiles  GithubProfile[]
+  skills           Skill[]
+  connects_ledger  ConnectsLedger[]
+  ai_analyses      AiAnalysis[]
+  templates        ProposalTemplate[]
+
+  @@map("tenants")
+}
+
+// ============================================================================
+// Authentication & Authorization
+// ============================================================================
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model User {
+  id              String   @id @default(cuid())
+  tenant_id       String
+  email           String
+  name            String
+  avatar_url      String?
+  role            UserRole @default(MEMBER)
+  is_active       Boolean  @default(true)
+  email_verified  Boolean  @default(false)
+  hashed_password String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  sessions       Session[]
+  oauth_accounts OAuthAccount[]
+  proposals      Proposal[]
+  projects       ProjectMember[]
+  activity       ActivityLog[]
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id])
+  @@map("users")
+}
+
+model OAuthAccount {
+  id                  String   @id @default(cuid())
+  user_id             String
+  provider            String
+  provider_account_id String
+  access_token        String?
+  refresh_token       String?
+  token_type          String?
+  scope               String?
+  expires_at          Int?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider, provider_account_id])
+  @@index([user_id])
+  @@map("oauth_accounts")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  user_id    String
+  token      String   @unique
+  expires_at DateTime
+  ip_address String?
+  user_agent String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("sessions")
+}
+
+// ============================================================================
+// Upwork Profile
+// ============================================================================
+
+model UpworkProfile {
+  id                   String   @id @default(cuid())
+  tenant_id            String
+  profile_url          String
+  display_name         String
+  title                String?
+  overview             String?
+  hourly_rate          Decimal? @db.Decimal(10, 2)
+  total_earnings       Decimal? @db.Decimal(12, 2)
+  job_success_score    Int?
+  total_hours          Decimal? @db.Decimal(10, 2)
+  total_jobs           Int?
+  available_connects   Int      @default(0)
+  profile_visibility   String?
+  response_time        String?
+  location             String?
+  timezone             String?
+  raw_data             Json?
+  last_synced_at       DateTime?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, profile_url])
+  @@index([tenant_id])
+  @@map("upwork_profiles")
+}
+
+// ============================================================================
+// Job Management
+// ============================================================================
+
+enum JobStatus {
+  NEW
+  ANALYZED
+  SHORTLISTED
+  BIDDING
+  BID_SENT
+  INTERVIEWING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  SKIPPED
+  FLAGGED
+}
+
+enum JobType {
+  HOURLY
+  FIXED_PRICE
+}
+
+enum ExperienceLevel {
+  ENTRY
+  INTERMEDIATE
+  EXPERT
+}
+
+model Job {
+  id                    String          @id @default(cuid())
+  tenant_id             String
+  upwork_job_id         String
+  title                 String
+  description           String
+  job_type              JobType
+  experience_level      ExperienceLevel?
+  budget_min            Decimal?        @db.Decimal(12, 2)
+  budget_max            Decimal?        @db.Decimal(12, 2)
+  hourly_rate_min       Decimal?        @db.Decimal(10, 2)
+  hourly_rate_max       Decimal?        @db.Decimal(10, 2)
+  estimated_duration    String?
+  job_url               String
+  client_country        String?
+  client_rating         Decimal?        @db.Decimal(3, 2)
+  client_total_spent    Decimal?        @db.Decimal(14, 2)
+  client_total_hires    Int?
+  client_total_posted   Int?
+  client_hire_rate      Decimal?        @db.Decimal(5, 2)
+  client_member_since   DateTime?
+  client_payment_verified Boolean       @default(false)
+  proposals_count       Int?
+  connects_required     Int?
+  is_featured           Boolean         @default(false)
+  is_duplicate          Boolean         @default(false)
+  duplicate_of_id       String?
+  is_flagged_fake       Boolean         @default(false)
+  status                JobStatus       @default(NEW)
+  posted_at             DateTime?
+  captured_at           DateTime        @default(now())
+  skills_required       String[]
+  category              String?
+  subcategory           String?
+  raw_data              Json?
+  created_at            DateTime        @default(now())
+  updated_at            DateTime        @updatedAt
+
+  tenant        Tenant       @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  duplicate_of  Job?         @relation("JobDuplicates", fields: [duplicate_of_id], references: [id])
+  duplicates    Job[]        @relation("JobDuplicates")
+  analyses      AiAnalysis[]
+  proposals     Proposal[]
+  tags          JobTag[]
+  notes         JobNote[]
+
+  @@unique([tenant_id, upwork_job_id])
+  @@index([tenant_id, status])
+  @@index([tenant_id, posted_at])
+  @@index([tenant_id, is_duplicate])
+  @@index([tenant_id, is_flagged_fake])
+  @@map("jobs")
+}
+
+model JobTag {
+  id         String   @id @default(cuid())
+  job_id     String
+  tag        String
+  created_at DateTime @default(now())
+
+  job Job @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@unique([job_id, tag])
+  @@index([tag])
+  @@map("job_tags")
+}
+
+model JobNote {
+  id         String   @id @default(cuid())
+  job_id     String
+  content    String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  job Job @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([job_id])
+  @@map("job_notes")
+}
+
+// ============================================================================
+// AI Analysis
+// ============================================================================
+
+enum AnalysisType {
+  JOB_FIT
+  FAKE_DETECTION
+  DUPLICATE_CHECK
+  PROPOSAL_REVIEW
+  CLIENT_ANALYSIS
+}
+
+model AiAnalysis {
+  id                  String       @id @default(cuid())
+  tenant_id           String
+  job_id              String
+  analysis_type       AnalysisType
+  fit_score           Int?         // 0-100
+  fake_probability    Int?         // 0-100
+  win_probability     Int?         // 0-100
+  recommendation      String?      // BID, SKIP, CAUTIOUS
+  reasoning           String?
+  strengths           String[]
+  weaknesses          String[]
+  suggested_rate      Decimal?     @db.Decimal(10, 2)
+  suggested_duration  String?
+  key_points          String[]
+  red_flags           String[]
+  matched_skills      String[]
+  missing_skills      String[]
+  model_used          String?
+  tokens_used         Int?
+  raw_response        Json?
+  created_at          DateTime     @default(now())
+  updated_at          DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  job    Job    @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, job_id])
+  @@index([job_id, analysis_type])
+  @@map("ai_analyses")
+}
+
+// ============================================================================
+// Proposals
+// ============================================================================
+
+enum ProposalStatus {
+  DRAFT
+  REVIEW
+  READY
+  SENT
+  VIEWED
+  SHORTLISTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+model Proposal {
+  id                String         @id @default(cuid())
+  tenant_id         String
+  job_id            String
+  user_id           String
+  cover_letter      String
+  proposed_rate     Decimal?       @db.Decimal(10, 2)
+  proposed_duration String?
+  milestones        Json?
+  questions_answers Json?
+  attachments       Json?
+  connects_used     Int?
+  status            ProposalStatus @default(DRAFT)
+  ai_generated      Boolean        @default(false)
+  ai_version        Int?
+  sent_at           DateTime?
+  viewed_at         DateTime?
+  responded_at      DateTime?
+  raw_data          Json?
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  job    Job    @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, status])
+  @@index([job_id])
+  @@map("proposals")
+}
+
+model ProposalTemplate {
+  id          String   @id @default(cuid())
+  tenant_id   String
+  name        String
+  description String?
+  content     String
+  variables   String[]
+  is_default  Boolean  @default(false)
+  category    String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@map("proposal_templates")
+}
+
+// ============================================================================
+// Project Management
+// ============================================================================
+
+enum ProjectStatus {
+  PENDING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+model Project {
+  id                  String        @id @default(cuid())
+  tenant_id           String
+  client_id           String
+  title               String
+  description         String?
+  upwork_contract_id  String?
+  job_type            JobType
+  budget              Decimal?      @db.Decimal(12, 2)
+  hourly_rate         Decimal?      @db.Decimal(10, 2)
+  estimated_hours     Decimal?      @db.Decimal(10, 2)
+  actual_hours        Decimal?      @db.Decimal(10, 2)
+  total_earned        Decimal?      @db.Decimal(12, 2)
+  status              ProjectStatus @default(PENDING)
+  start_date          DateTime?
+  end_date            DateTime?
+  deadline            DateTime?
+  upwork_feedback     Json?
+  client_satisfaction Int?
+  notes               String?
+  raw_data            Json?
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+
+  tenant     Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  client     Client          @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  members    ProjectMember[]
+  milestones Milestone[]
+  tasks      Task[]
+  time_logs  TimeLog[]
+
+  @@index([tenant_id, status])
+  @@index([client_id])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id         String   @id @default(cuid())
+  project_id String
+  user_id    String
+  role       String   @default("contributor")
+  joined_at  DateTime @default(now())
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, user_id])
+  @@map("project_members")
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  PAID
+  REVISION
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  project_id  String
+  title       String
+  description String?
+  amount      Decimal?        @db.Decimal(12, 2)
+  due_date    DateTime?
+  status      MilestoneStatus @default(PENDING)
+  order       Int             @default(0)
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id])
+  @@map("milestones")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  project_id  String
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  due_date    DateTime?
+  order       Int          @default(0)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id, status])
+  @@map("tasks")
+}
+
+model TimeLog {
+  id          String   @id @default(cuid())
+  project_id  String
+  description String?
+  hours       Decimal  @db.Decimal(6, 2)
+  logged_date DateTime
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id])
+  @@map("time_logs")
+}
+
+// ============================================================================
+// Client Management
+// ============================================================================
+
+enum ClientStatus {
+  PROSPECT
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+model Client {
+  id                    String       @id @default(cuid())
+  tenant_id             String
+  upwork_client_id      String?
+  name                  String
+  company               String?
+  email                 String?
+  country               String?
+  timezone              String?
+  upwork_rating         Decimal?     @db.Decimal(3, 2)
+  total_spent           Decimal?     @db.Decimal(14, 2)
+  total_hires           Int?
+  payment_verified      Boolean      @default(false)
+  status                ClientStatus @default(PROSPECT)
+  notes                 String?
+  communication_style   String?
+  preferred_contact     String?
+  raw_data              Json?
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  projects Project[]
+
+  @@unique([tenant_id, upwork_client_id])
+  @@index([tenant_id, status])
+  @@map("clients")
+}
+
+// ============================================================================
+// Skills & GitHub Integration
+// ============================================================================
+
+model GithubProfile {
+  id              String   @id @default(cuid())
+  tenant_id       String
+  github_username String
+  access_token    String?
+  avatar_url      String?
+  bio             String?
+  public_repos    Int?
+  total_stars     Int?
+  top_languages   Json?
+  top_repos       Json?
+  contributions   Json?
+  last_synced_at  DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, github_username])
+  @@index([tenant_id])
+  @@map("github_profiles")
+}
+
+enum SkillSource {
+  MANUAL
+  GITHUB
+  UPWORK
+  AI_DETECTED
+}
+
+model Skill {
+  id               String      @id @default(cuid())
+  tenant_id        String
+  name             String
+  category         String?
+  proficiency      Int?        // 1-10
+  years_experience Decimal?    @db.Decimal(4, 1)
+  source           SkillSource @default(MANUAL)
+  is_primary       Boolean     @default(false)
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, name])
+  @@index([tenant_id])
+  @@map("skills")
+}
+
+// ============================================================================
+// Connects Tracking
+// ============================================================================
+
+enum ConnectsTransactionType {
+  PURCHASE
+  BID_SPENT
+  BID_REFUND
+  MONTHLY_FREE
+  BONUS
+  ADJUSTMENT
+}
+
+model ConnectsLedger {
+  id               String                  @id @default(cuid())
+  tenant_id        String
+  transaction_type ConnectsTransactionType
+  amount           Int
+  balance_after    Int
+  description      String?
+  reference_id     String?
+  created_at       DateTime                @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, created_at])
+  @@map("connects_ledger")
+}
+
+// ============================================================================
+// Activity Log
+// ============================================================================
+
+model ActivityLog {
+  id             String   @id @default(cuid())
+  user_id        String?
+  entity_type    String
+  entity_id      String
+  action         String
+  details        Json?
+  correlation_id String?
+  ip_address     String?
+  created_at     DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([entity_type, entity_id])
+  @@index([user_id])
+  @@index([correlation_id])
+  @@map("activity_logs")
+}
