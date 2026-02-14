@@ -3,6 +3,7 @@
  */
 
 import type { Metadata } from "next";
+import { Shield } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ScopeShieldContainer } from "@/components/modules/scope-shield/scope-shield-container";
 
@@ -17,9 +18,10 @@ export default function ScopeShieldPage() {
       <PageHeader
         title="Scope Shield"
         description="Define your project scope, detect scope creep from client messages, generate diplomatic responses, and create change orders."
+        icon={Shield}
+        accentGradient="from-red-500/50 via-orange-500/30 to-amber-500/50"
       />
       <ScopeShieldContainer />
     </div>
   );
 }
-

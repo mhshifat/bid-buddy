@@ -121,8 +121,13 @@ export function JobList() {
       ) : (
         <>
           <div className="space-y-3">
-            {data.items.map((job) => (
-              <JobCard key={job.id} {...job} />
+            {data.items.map((job, idx) => (
+              <div
+                key={job.id}
+                className={`animate-fade-in-up stagger-${Math.min(idx + 1, 6)}`}
+              >
+                <JobCard {...job} />
+              </div>
             ))}
           </div>
 
@@ -155,7 +160,7 @@ function JobListSkeleton() {
       </div>
       {/* Card skeletons */}
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="rounded-lg border p-4">
+        <div key={i} className="rounded-2xl border p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-2">
@@ -163,9 +168,9 @@ function JobListSkeleton() {
                 <Skeleton className="h-5 w-16 rounded-full" />
               </div>
               <Skeleton className="h-4 w-full max-w-lg" />
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 {Array.from({ length: 4 }).map((_, j) => (
-                  <Skeleton key={j} className="h-5 w-16 rounded-full" />
+                  <Skeleton key={j} className="h-5 w-16 rounded-md" />
                 ))}
               </div>
               <div className="flex gap-4">
@@ -175,8 +180,8 @@ function JobListSkeleton() {
               </div>
             </div>
             <div className="space-y-2">
-              <Skeleton className="h-5 w-12" />
-              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-5 w-12 rounded-lg" />
+              <Skeleton className="h-4 w-16 rounded-lg" />
             </div>
           </div>
         </div>

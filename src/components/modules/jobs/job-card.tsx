@@ -1,7 +1,11 @@
 "use client";
 
+/**
+ * Job Card — bento-style card with glass overlay, hover gradient reveal,
+ * animated micro-interactions, and AI insight badges.
+ */
+
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +24,8 @@ import {
   Copy as CopyIcon,
   Shield,
   TrendingUp,
+  Target,
+  ChevronRight,
 } from "lucide-react";
 import { JobStatusBadge } from "./job-status-badge";
 
@@ -92,28 +98,46 @@ function getScoreColor(score: number): string {
   return "text-red-600";
 }
 
+function getScoreBg(score: number): string {
+  if (score >= 70) return "bg-emerald-500/10";
+  if (score >= 40) return "bg-amber-500/10";
+  return "bg-red-500/10";
+}
+
 export function JobCard(props: JobCardProps) {
   const analysis = props.latestAnalysis;
 
   return (
-    <Card
-      className={`transition-all hover:shadow-md ${
-        props.isFlaggedFake
-          ? "border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/20"
-          : props.isDuplicate
-            ? "border-amber-200 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/20"
-            : ""
-      }`}
+    <div
+      className={`
+        group relative overflow-hidden rounded-2xl border
+        bg-card transition-all duration-300
+        hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5
+        dark:hover:shadow-black/20
+        ${
+          props.isFlaggedFake
+            ? "border-red-200 bg-gradient-to-r from-red-50/30 to-card dark:border-red-900 dark:from-red-950/20"
+            : props.isDuplicate
+              ? "border-amber-200 bg-gradient-to-r from-amber-50/30 to-card dark:border-amber-900 dark:from-amber-950/20"
+              : ""
+        }
+      `}
     >
-      <CardContent className="p-4">
+      {/* Shimmer */}
+      <div className="shimmer-bg pointer-events-none absolute inset-0 rounded-2xl" />
+
+      {/* Hover gradient reveal */}
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+      <div className="relative z-10 p-4">
         <div className="flex items-start justify-between gap-3">
           {/* Left: Job info */}
-          <div className="flex-1 space-y-2">
+          <div className="flex-1 space-y-2.5 min-w-0">
             {/* Title & badges row */}
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/jobs/${props.id}`}
-                className="text-sm font-semibold leading-tight hover:underline"
+                className="text-sm font-semibold leading-tight hover:text-primary transition-colors"
               >
                 {props.title}
               </Link>
@@ -121,7 +145,7 @@ export function JobCard(props: JobCardProps) {
               {props.isFeatured && (
                 <Badge
                   variant="secondary"
-                  className="bg-amber-100 text-[10px] text-amber-800"
+                  className="bg-amber-100 text-[10px] text-amber-800 rounded-md dark:bg-amber-500/20 dark:text-amber-300"
                 >
                   Featured
                 </Badge>
@@ -151,12 +175,12 @@ export function JobCard(props: JobCardProps) {
 
             {/* Skills */}
             {props.skillsRequired.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {props.skillsRequired.slice(0, 6).map((skill) => (
                   <Badge
                     key={skill}
                     variant="outline"
-                    className="text-[10px] font-normal"
+                    className="text-[10px] font-normal rounded-md border-primary/20 bg-primary/5"
                   >
                     {skill}
                   </Badge>
@@ -164,7 +188,7 @@ export function JobCard(props: JobCardProps) {
                 {props.skillsRequired.length > 6 && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] font-normal text-muted-foreground"
+                    className="text-[10px] font-normal text-muted-foreground rounded-md"
                   >
                     +{props.skillsRequired.length - 6}
                   </Badge>
@@ -175,12 +199,12 @@ export function JobCard(props: JobCardProps) {
             {/* Meta row */}
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <DollarSign className="h-3 w-3" />
+                <DollarSign className="h-3 w-3 text-emerald-500" />
                 {formatBudget(props)}
               </span>
               {props.connectsRequired && (
                 <span className="flex items-center gap-1">
-                  <Zap className="h-3 w-3" />
+                  <Zap className="h-3 w-3 text-amber-500" />
                   {props.connectsRequired} connects
                 </span>
               )}
@@ -192,7 +216,7 @@ export function JobCard(props: JobCardProps) {
               )}
               {props.clientRating && (
                 <span className="flex items-center gap-1">
-                  <Star className="h-3 w-3" />
+                  <Star className="h-3 w-3 text-amber-500" />
                   {props.clientRating.toFixed(1)}
                 </span>
               )}
@@ -214,18 +238,16 @@ export function JobCard(props: JobCardProps) {
             </div>
           </div>
 
-          {/* Right: AI analysis scores & actions */}
+          {/* Right: AI analysis scores + actions */}
           <div className="flex shrink-0 flex-col items-end gap-2">
             {analysis && (
-              <div className="flex flex-col items-end gap-1 text-right">
+              <div className="flex flex-col items-end gap-1.5 text-right">
                 {analysis.fitScore !== null && (
                   <Tooltip>
                     <TooltipTrigger>
-                      <div className="flex items-center gap-1">
+                      <div className={`flex items-center gap-1 rounded-lg px-2 py-0.5 ${getScoreBg(analysis.fitScore)}`}>
                         <TrendingUp className="h-3 w-3" />
-                        <span
-                          className={`text-xs font-semibold ${getScoreColor(analysis.fitScore)}`}
-                        >
+                        <span className={`text-xs font-semibold ${getScoreColor(analysis.fitScore)}`}>
                           {analysis.fitScore}%
                         </span>
                       </div>
@@ -236,11 +258,12 @@ export function JobCard(props: JobCardProps) {
                 {analysis.winProbability !== null && (
                   <Tooltip>
                     <TooltipTrigger>
-                      <span
-                        className={`text-[10px] ${getScoreColor(analysis.winProbability)}`}
-                      >
-                        {analysis.winProbability}% win
-                      </span>
+                      <div className={`flex items-center gap-1 rounded-lg px-2 py-0.5 ${getScoreBg(analysis.winProbability)}`}>
+                        <Target className="h-2.5 w-2.5" />
+                        <span className={`text-[10px] font-medium ${getScoreColor(analysis.winProbability)}`}>
+                          {analysis.winProbability}% win
+                        </span>
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>Win Probability</TooltipContent>
                   </Tooltip>
@@ -252,26 +275,33 @@ export function JobCard(props: JobCardProps) {
                         ? "default"
                         : "secondary"
                     }
-                    className="text-[10px]"
+                    className="text-[10px] rounded-md"
                   >
                     {analysis.recommendation}
                   </Badge>
                 )}
               </div>
             )}
-            <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-              <a
-                href={props.jobUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </Button>
+
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" asChild>
+                <a
+                  href={props.jobUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                <Link href={`/jobs/${props.id}`}>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
-

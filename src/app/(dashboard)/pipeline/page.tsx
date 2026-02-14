@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/seo/config";
-import { PageHeader } from "@/components/shared/page-header";
+import { PipelineHeader } from "@/components/modules/pipeline/pipeline-header";
 import { PipelineStats } from "@/components/modules/pipeline/pipeline-stats";
 import { PipelineBoard } from "@/components/modules/pipeline/pipeline-board";
 
@@ -12,13 +12,14 @@ export const metadata: Metadata = createPageMetadata(
 export default function PipelinePage() {
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Pipeline"
-        description="Track every job's journey — from discovery through bidding, winning, delivering, and getting paid."
-      />
+      {/* Hero header with animated SVG background */}
+      <PipelineHeader />
+
+      {/* Bento-grid funnel stats */}
       <PipelineStats />
+
+      {/* Kanban / List board */}
       <PipelineBoard />
     </div>
   );
 }
-

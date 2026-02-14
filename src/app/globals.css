@@ -126,3 +126,124 @@
     font-family: var(--font-sans), system-ui, sans-serif;
   }
 }
+
+/* ==========================================================================
+   Pipeline – Custom Animations & Utilities
+   ========================================================================== */
+
+/* Staggered fade-in-up for bento cards */
+@keyframes fade-in-up {
+  0% { opacity: 0; transform: translateY(16px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Stagger delay utilities */
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 80ms; }
+.stagger-3 { animation-delay: 160ms; }
+.stagger-4 { animation-delay: 240ms; }
+.stagger-5 { animation-delay: 320ms; }
+.stagger-6 { animation-delay: 400ms; }
+
+/* Gentle float for icons */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Shimmer sweep on cards */
+@keyframes shimmer-sweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 40%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 6s ease-in-out infinite;
+}
+
+/* Subtle breathing glow on active dots */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--glow-color, 99, 102, 241), 0.4); }
+  50% { box-shadow: 0 0 12px 4px rgba(var(--glow-color, 99, 102, 241), 0.15); }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+
+/* Spin slow for decorative rings */
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 25s linear infinite;
+}
+
+/* Slide-in from left for timeline items */
+@keyframes slide-in-left {
+  0% { opacity: 0; transform: translateX(-20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Scale-in for badges and micro elements */
+@keyframes scale-in {
+  0% { opacity: 0; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Gradient border animation */
+@keyframes gradient-border {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+.animate-gradient-border {
+  animation: gradient-border 3s ease-in-out infinite;
+}
+
+/* Number count-up illusion via CSS only */
+@keyframes count-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count-up {
+  animation: count-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Dotted path animation for pipeline connector */
+@keyframes dash-flow {
+  0% { stroke-dashoffset: 12; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-dash-flow {
+  animation: dash-flow 1.5s linear infinite;
+}

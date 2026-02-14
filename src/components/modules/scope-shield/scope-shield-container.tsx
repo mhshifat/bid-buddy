@@ -1,6 +1,6 @@
 /**
  * Scope Shield Container – main orchestrator for the Scope Shield page.
- * Two-column layout: scope list on the left, analyzer on the right.
+ * Bento-grid layout: scope list on the left, analyzer on the right.
  */
 
 "use client";
@@ -11,7 +11,6 @@ import { ScopeList } from "./scope-list";
 import { ScopeCreepAnalyzer } from "./scope-creep-analyzer";
 import { ChangeRequestHistory } from "./change-request-history";
 import { DefineScopeDialog } from "./define-scope-dialog";
-import { Card, CardContent } from "@/components/ui/card";
 import { Shield } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 
@@ -44,32 +43,34 @@ export function ScopeShieldContainer() {
       {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Left: Scope List */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4 animate-fade-in-up stagger-1">
           <ScopeList onSelect={handleSelect} selectedScopeId={selectedScopeId ?? undefined} />
         </div>
 
         {/* Right: Analyzer + History */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-3 space-y-4 animate-fade-in-up stagger-2">
           {selectedScopeId ? (
             <>
               <ScopeCreepAnalyzer scopeId={selectedScopeId} scopeTitle={selectedScopeTitle} />
               <ChangeRequestHistory scopeId={selectedScopeId} />
             </>
           ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <Shield className="h-16 w-16 text-muted-foreground/20 mb-4" />
+            <div className="relative overflow-hidden rounded-2xl border bg-card">
+              <div className="shimmer-bg pointer-events-none absolute inset-0 rounded-2xl" />
+              <div className="relative z-10 flex flex-col items-center justify-center py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4 animate-float">
+                  <Shield className="h-8 w-8 text-primary/40" />
+                </div>
                 <h3 className="text-lg font-semibold">Select a Scope</h3>
                 <p className="text-sm text-muted-foreground max-w-md mt-1">
                   Choose a project scope from the left to start checking client
                   messages for scope creep, or define a new scope to get started.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
         </div>
       </div>
     </div>
   );
 }
-

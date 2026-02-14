@@ -85,6 +85,17 @@ export interface JobFitAnalysisResult {
 // Proposal Generation
 // ---------------------------------------------------------------------------
 
+/** Lightweight repo summary passed to the AI for matching. */
+export interface GitHubRepoContext {
+  name: string;
+  fullName: string;
+  url: string;
+  description: string | null;
+  language: string | null;
+  topics: string[];
+  stars: number;
+}
+
 export interface ProposalGenerationInput {
   jobTitle: string;
   jobDescription: string;
@@ -102,6 +113,20 @@ export interface ProposalGenerationInput {
     matchedSkills: string[];
     suggestedRate: number | null;
   } | null;
+  /** GitHub repos available for showcasing to the client. */
+  githubRepos: GitHubRepoContext[];
+}
+
+/** A matched GitHub repo recommended by AI to showcase in the proposal. */
+export interface RelevantRepo {
+  name: string;
+  fullName: string;
+  url: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  /** AI-generated one-liner explaining why this repo is relevant to the job. */
+  relevanceReason: string;
 }
 
 export interface ProposalGenerationResult {
@@ -110,6 +135,8 @@ export interface ProposalGenerationResult {
   proposedDuration: string | null;
   keySellingPoints: string[];
   questionsForClient: string[];
+  /** GitHub repos the AI recommends showcasing for this job (max 3). */
+  relevantRepos: RelevantRepo[];
 }
 
 // ---------------------------------------------------------------------------

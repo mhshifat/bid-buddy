@@ -1,9 +1,13 @@
 "use client";
 
+/**
+ * Client List — bento grid of client cards with glass-morphism,
+ * staggered animations, and hover micro-interactions.
+ */
+
 import { useState, useCallback } from "react";
-import { Users, Star, Shield, DollarSign, MapPin } from "lucide-react";
+import { Users, Star, Shield, DollarSign, MapPin, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -17,7 +21,6 @@ import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PaginationControls } from "@/components/shared/pagination-controls";
-import { Search } from "lucide-react";
 
 const clientStatusColors: Record<string, string> = {
   PROSPECT: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
@@ -68,11 +71,11 @@ export function ClientList() {
             placeholder="Search clients..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9"
+            className="pl-9 rounded-xl"
           />
         </div>
         <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-[150px] rounded-xl">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -94,11 +97,26 @@ export function ClientList() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {data.items.map((client) => (
-              <Card key={client.id} className="transition-all hover:shadow-md">
-                <CardContent className="p-4 space-y-3">
+            {data.items.map((client, idx) => (
+              <div
+                key={client.id}
+                className={`
+                  animate-fade-in-up stagger-${Math.min(idx + 1, 6)}
+                  group relative overflow-hidden rounded-2xl border bg-card
+                  p-4 transition-all duration-300
+                  hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5
+                  dark:hover:shadow-black/20
+                `}
+              >
+                {/* Shimmer overlay */}
+                <div className="shimmer-bg pointer-events-none absolute inset-0 rounded-2xl" />
+
+                {/* Hover gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className="relative z-10 space-y-3">
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1">
+                    <div className="space-y-1 min-w-0">
                       <h3 className="text-sm font-semibold">{client.name}</h3>
                       {client.company && (
                         <p className="text-xs text-muted-foreground">
@@ -108,7 +126,7 @@ export function ClientList() {
                     </div>
                     <Badge
                       variant="secondary"
-                      className={`shrink-0 text-[10px] ${clientStatusColors[client.status] ?? ""}`}
+                      className={`shrink-0 text-[10px] rounded-md ${clientStatusColors[client.status] ?? ""}`}
                     >
                       {client.status}
                     </Badge>
@@ -123,7 +141,7 @@ export function ClientList() {
                     )}
                     {client.totalSpent !== null && (
                       <span className="flex items-center gap-1">
-                        <DollarSign className="h-3 w-3" />
+                        <DollarSign className="h-3 w-3 text-emerald-500" />
                         ${client.totalSpent.toLocaleString()}
                       </span>
                     )}
@@ -144,8 +162,8 @@ export function ClientList() {
                   <p className="text-xs text-muted-foreground">
                     {client.projectCount} project{client.projectCount !== 1 ? "s" : ""}
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
 
@@ -169,12 +187,12 @@ function ClientListSkeleton() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Skeleton className="h-10 flex-1 max-w-sm" />
-        <Skeleton className="h-10 w-[150px]" />
+        <Skeleton className="h-10 flex-1 max-w-sm rounded-xl" />
+        <Skeleton className="h-10 w-[150px] rounded-xl" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-lg border p-4 space-y-3">
+          <div key={i} className="rounded-2xl border p-4 space-y-3">
             <Skeleton className="h-5 w-32" />
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-3 w-20" />
@@ -184,4 +202,3 @@ function ClientListSkeleton() {
     </div>
   );
 }
-

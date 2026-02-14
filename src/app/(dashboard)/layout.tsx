@@ -36,9 +36,9 @@ export default async function DashboardLayout({
           <RealtimeToastProvider />
           <SidebarProvider>
             <AppSidebar />
-            <SidebarInset>
+            <SidebarInset className="overflow-hidden">
               <TopBar />
-              <main className="flex-1 overflow-auto p-6">{children}</main>
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-6">{children}</div>
             </SidebarInset>
           </SidebarProvider>
         </TooltipProvider>

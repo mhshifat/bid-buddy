@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Convert to Project Dialog — creates a project from an accepted job.
+ * Convert to Project Dialog — polished dialog for creating a project from
+ * an accepted job with clean form layout, geometric accents, and micro-interactions.
  */
 
 import { useState, useCallback } from "react";
@@ -24,9 +25,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Rocket } from "lucide-react";
+import { Loader2, Rocket, DollarSign, Clock, CalendarDays, User2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { toast } from "sonner";
+
+// ---------------------------------------------------------------------------
+// Decorative header SVG
+// ---------------------------------------------------------------------------
+
+function DialogHeaderSvg() {
+  return (
+    <svg
+      className="absolute right-0 top-0 h-24 w-24 text-primary/5 pointer-events-none"
+      viewBox="0 0 100 100"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="80" cy="20" r="40" stroke="currentColor" strokeWidth="0.8" className="animate-spin-slow" />
+      <circle cx="80" cy="20" r="25" stroke="currentColor" strokeWidth="0.5" opacity="0.5" style={{ animationDirection: "reverse" }} />
+      <polygon points="80,5 85,15 75,15" fill="currentColor" opacity="0.1" />
+    </svg>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -124,35 +144,51 @@ export function ConvertToProjectDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Rocket className="h-5 w-5" />
-            Convert to Project
-          </DialogTitle>
-          <DialogDescription>
-            Create an active project from this accepted job. Link it to a client to track delivery.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[540px] overflow-hidden rounded-2xl border-border/50 p-0">
+        {/* Header with gradient accent */}
+        <div className="relative border-b bg-gradient-to-br from-card to-primary/[0.02] px-6 pt-6 pb-4">
+          <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-violet-500 via-primary to-emerald-500 opacity-60" />
+          <DialogHeaderSvg />
+          <DialogHeader className="relative z-10">
+            <DialogTitle className="flex items-center gap-2.5 text-lg">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">
+                <Rocket className="h-4 w-4 text-primary" />
+              </div>
+              Convert to Project
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Create an active project from this accepted job. Link it to a client to track delivery.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="conv-title">Project Title</Label>
+        {/* Form */}
+        <div className="px-6 py-5 space-y-5">
+          {/* Project Title */}
+          <div className="space-y-1.5">
+            <Label htmlFor="conv-title" className="text-xs font-medium text-muted-foreground">
+              Project Title
+            </Label>
             <Input
               id="conv-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Project title..."
+              className="rounded-xl border-border/50 focus-visible:ring-primary/30"
             />
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="conv-client">Client *</Label>
+          {/* Client Select */}
+          <div className="space-y-1.5">
+            <Label htmlFor="conv-client" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <User2 className="h-3 w-3" />
+              Client <span className="text-destructive">*</span>
+            </Label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger id="conv-client">
+              <SelectTrigger id="conv-client" className="rounded-xl border-border/50">
                 <SelectValue placeholder="Select client..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl">
                 {clients?.items.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name} {c.company ? `(${c.company})` : ""}
@@ -167,74 +203,103 @@ export function ConvertToProjectDialog({
             </Select>
           </div>
 
+          {/* Budget + Rate row */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="conv-budget">Budget ($)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="conv-budget" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <DollarSign className="h-3 w-3" />
+                Budget
+              </Label>
               <Input
                 id="conv-budget"
                 type="number"
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
                 placeholder="0"
+                className="rounded-xl border-border/50"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="conv-rate">Hourly Rate ($)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="conv-rate" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <DollarSign className="h-3 w-3" />
+                Hourly Rate
+              </Label>
               <Input
                 id="conv-rate"
                 type="number"
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 placeholder="0"
+                className="rounded-xl border-border/50"
               />
             </div>
           </div>
 
+          {/* Hours + Start date row */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="conv-hours">Est. Hours</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="conv-hours" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Clock className="h-3 w-3" />
+                Est. Hours
+              </Label>
               <Input
                 id="conv-hours"
                 type="number"
                 value={estimatedHours}
                 onChange={(e) => setEstimatedHours(e.target.value)}
                 placeholder="0"
+                className="rounded-xl border-border/50"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="conv-start">Start Date</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="conv-start" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <CalendarDays className="h-3 w-3" />
+                Start Date
+              </Label>
               <Input
                 id="conv-start"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                className="rounded-xl border-border/50"
               />
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="conv-deadline">Deadline</Label>
+          {/* Deadline */}
+          <div className="space-y-1.5">
+            <Label htmlFor="conv-deadline" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <CalendarDays className="h-3 w-3" />
+              Deadline
+            </Label>
             <Input
               id="conv-deadline"
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
+              className="rounded-xl border-border/50"
             />
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+        {/* Footer */}
+        <DialogFooter className="border-t bg-muted/20 px-6 py-4">
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            className="rounded-xl"
+          >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={convertMutation.isPending || !clientId}
+            className="rounded-xl gap-2 shadow-sm"
           >
             {convertMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Rocket className="mr-2 h-4 w-4" />
+              <Rocket className="h-4 w-4" />
             )}
             Create Project
           </Button>
@@ -243,4 +308,3 @@ export function ConvertToProjectDialog({
     </Dialog>
   );
 }
-

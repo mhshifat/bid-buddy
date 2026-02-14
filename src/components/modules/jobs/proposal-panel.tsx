@@ -32,6 +32,9 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  Github,
+  Star,
+  ExternalLink,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -49,6 +52,16 @@ interface ProposalData {
   proposedDuration: string | null;
   aiGenerated: boolean;
   createdAt: Date;
+}
+
+interface RelevantRepoData {
+  name: string;
+  fullName: string;
+  url: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  relevanceReason: string;
 }
 
 interface ProposalPanelProps {
@@ -74,6 +87,7 @@ export function ProposalPanel({
     proposedDuration: string | null;
     keySellingPoints: string[];
     questionsForClient: string[];
+    relevantRepos: RelevantRepoData[];
   } | null>(null);
 
   const generateMutation = trpc.ai.generateProposal.useMutation({
@@ -84,6 +98,7 @@ export function ProposalPanel({
         proposedDuration: data.proposedDuration,
         keySellingPoints: data.keySellingPoints,
         questionsForClient: data.questionsForClient,
+        relevantRepos: data.relevantRepos ?? [],
       });
       setGenerationError(null);
       onProposalGenerated();
@@ -214,6 +229,7 @@ interface GeneratedProposalViewProps {
     proposedDuration: string | null;
     keySellingPoints: string[];
     questionsForClient: string[];
+    relevantRepos: RelevantRepoData[];
   };
   onRegenerate: () => void;
 }
@@ -313,6 +329,25 @@ function GeneratedProposalView({
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Relevant GitHub Repos */}
+      {content.relevantRepos.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Github className="h-4 w-4 text-violet-500" />
+              Relevant GitHub Repos to Showcase
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {content.relevantRepos.map((repo) => (
+                <RelevantRepoCard key={repo.fullName} repo={repo} />
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -445,6 +480,101 @@ function SavedProposalCard({ proposal }: { proposal: ProposalData }) {
         </CardContent>
       )}
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Relevant GitHub Repo Card
+// ---------------------------------------------------------------------------
+
+function RelevantRepoCard({ repo }: { repo: RelevantRepoData }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyUrl = useCallback(async () => {
+    await navigator.clipboard.writeText(repo.url);
+    setCopied(true);
+    toast.success("Repo URL copied!");
+    setTimeout(() => setCopied(false), 2000);
+  }, [repo.url]);
+
+  return (
+    <div className="group relative overflow-hidden rounded-xl border bg-gradient-to-br from-card to-card p-4 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+      {/* Top accent */}
+      <div className="absolute left-0 top-0 h-[2px] w-full bg-gradient-to-r from-transparent via-violet-500/40 to-transparent" />
+
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {/* Repo name + language badge */}
+          <div className="flex items-center gap-2">
+            <Github className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="truncate text-sm font-semibold text-foreground">
+              {repo.fullName}
+            </span>
+            {repo.language && (
+              <Badge variant="secondary" className="shrink-0 text-[10px]">
+                {repo.language}
+              </Badge>
+            )}
+          </div>
+
+          {/* Description */}
+          {repo.description && (
+            <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
+              {repo.description}
+            </p>
+          )}
+
+          {/* Relevance reason */}
+          <p className="mt-2 text-xs font-medium text-violet-600 dark:text-violet-400">
+            💡 {repo.relevanceReason}
+          </p>
+
+          {/* Stars */}
+          <div className="mt-2 flex items-center gap-3">
+            {repo.stars > 0 && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Star className="h-3 w-3 text-amber-500" />
+                {repo.stars}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex shrink-0 flex-col gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href={repo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>Open on GitHub</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={handleCopyUrl}
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy repo URL</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+    </div>
   );
 }
 

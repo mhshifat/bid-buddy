@@ -307,6 +307,39 @@ export const aiRouter = createRouter({
           }
         : null;
 
+      // ---------------------------------------------------------------
+      // Fetch user's GitHub repos (stored as JSON in github_profiles)
+      // ---------------------------------------------------------------
+      const githubProfile = await ctx.prisma.githubProfile.findFirst({
+        where: { tenant_id: tenantId },
+        select: { top_repos: true },
+      });
+
+      type StoredRepoShape = {
+        name: string;
+        fullName: string;
+        url: string;
+        description: string | null;
+        language: string | null;
+        topics: string[];
+        stars: number;
+        forks?: number;
+        pushedAt?: string;
+      };
+
+      const githubRepos: import("@/server/ai/types").GitHubRepoContext[] =
+        Array.isArray(githubProfile?.top_repos)
+          ? (githubProfile.top_repos as StoredRepoShape[]).map((r) => ({
+              name: r.name,
+              fullName: r.fullName,
+              url: r.url,
+              description: r.description ?? null,
+              language: r.language ?? null,
+              topics: Array.isArray(r.topics) ? r.topics : [],
+              stars: r.stars ?? 0,
+            }))
+          : [];
+
       const aiService = getAiService();
 
       // TODO: Replace with actual user from auth context
@@ -324,6 +357,7 @@ export const aiRouter = createRouter({
           hourlyRateMax: job.hourly_rate_max ? Number(job.hourly_rate_max) : null,
           estimatedDuration: job.estimated_duration,
           analysisContext,
+          githubRepos,
         },
         job.id,
         tenantId,
@@ -345,6 +379,7 @@ export const aiRouter = createRouter({
         proposedDuration: result.proposedDuration,
         keySellingPoints: result.keySellingPoints,
         questionsForClient: result.questionsForClient,
+        relevantRepos: result.relevantRepos ?? [],
       };
     }),
 

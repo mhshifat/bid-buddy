@@ -151,6 +151,17 @@ export function buildProposalPrompt(
     ? `\n## Prior AI Analysis\n- Fit Score: ${input.analysisContext.fitScore}%\n- Strengths: ${input.analysisContext.strengths.join(", ")}\n- Matched Skills: ${input.analysisContext.matchedSkills.join(", ")}\n- Suggested Rate: $${input.analysisContext.suggestedRate ?? "N/A"}`
     : "";
 
+  // Build GitHub repos context
+  const githubReposNote =
+    input.githubRepos.length > 0
+      ? `\n## Freelancer GitHub Repositories\nThe freelancer has the following public GitHub repos that may be relevant to this job. Review them and pick up to 3 that are most relevant based on language, topics, and description matching the job requirements.\n\n${input.githubRepos
+          .map(
+            (r, i) =>
+              `${i + 1}. **${r.name}** (${r.fullName})\n   - URL: ${r.url}\n   - Language: ${r.language ?? "N/A"}\n   - Topics: ${r.topics.join(", ") || "None"}\n   - Stars: ${r.stars}\n   - Description: ${r.description ?? "No description"}`
+          )
+          .join("\n")}`
+      : "";
+
   const userPrompt = `Generate a winning Upwork proposal for the following job.
 
 ## Job Details
@@ -167,6 +178,7 @@ ${analysisNote}
 ## Freelancer Skills
 - **All Skills:** ${freelancer.skills.join(", ") || "None provided"}
 - **Primary Skills:** ${freelancer.primarySkills.join(", ") || "None provided"}
+${githubReposNote}
 
 ## Instructions
 Write a compelling, personalised cover letter. It should:
@@ -177,6 +189,9 @@ Write a compelling, personalised cover letter. It should:
 5. Be 150-250 words maximum
 6. Sound natural and human, not template-like
 7. Never use phrases like "I am writing to express my interest"
+8. If relevant GitHub repos are found, naturally mention 1-2 repos in the cover letter as proof of relevant experience
+
+Also select up to 3 GitHub repositories from the provided list that are most relevant to this job. For each, provide a brief explanation of why it is relevant. If no repos are relevant or none were provided, return an empty array.
 
 Respond with a JSON object using this exact schema:
 {
@@ -184,7 +199,18 @@ Respond with a JSON object using this exact schema:
   "proposedRate": <number | null, suggested rate in USD>,
   "proposedDuration": <string | null, estimated timeline>,
   "keySellingPoints": [<string, top 3-4 selling points used>],
-  "questionsForClient": [<string, 2-3 smart clarifying questions to include>]
+  "questionsForClient": [<string, 2-3 smart clarifying questions to include>],
+  "relevantRepos": [
+    {
+      "name": <string, repo name>,
+      "fullName": <string, owner/repo>,
+      "url": <string, URL to the repo>,
+      "description": <string | null, repo description>,
+      "language": <string | null, primary language>,
+      "stars": <number, star count>,
+      "relevanceReason": <string, one-liner on why this repo is relevant to the job>
+    }
+  ]
 }`;
 
   return [
