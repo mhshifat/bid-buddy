@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback } from "react";
-import { Users, Star, Shield, DollarSign, MapPin, Search } from "lucide-react";
+import { Users, Star, Shield, DollarSign, MapPin, Search, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ErrorDisplay } from "@/components/shared/error-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PaginationControls } from "@/components/shared/pagination-controls";
@@ -34,33 +36,21 @@ export function ClientList() {
   const [pageSize, setPageSize] = useState(20);
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
 
-  const { data, isLoading, error, refetch } = trpc.clientManagement.list.useQuery({
+  const { data, isLoading, isFetching, error, refetch } = trpc.clientManagement.list.useQuery({
     page,
     pageSize,
     status: status !== "all" ? (status as "ACTIVE") : undefined,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
+  }, {
+    placeholderData: keepPreviousData,
   });
 
   const handlePageSizeChange = useCallback((newSize: number) => {
     setPageSize(newSize);
     setPage(1);
   }, []);
-
-  if (isLoading) {
-    return <ClientListSkeleton />;
-  }
-
-  if (error) {
-    const errorData = error.data as { correlationId?: string; userMessage?: string } | undefined;
-    return (
-      <ErrorDisplay
-        message={errorData?.userMessage ?? "Failed to load clients."}
-        correlationId={errorData?.correlationId}
-        onRetry={() => refetch()}
-      />
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -88,7 +78,27 @@ export function ClientList() {
         </Select>
       </div>
 
-      {!data || data.items.length === 0 ? (
+      {isFetching && !isLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Updating results…
+        </div>
+      )}
+
+      {isLoading ? (
+        <ClientListContentSkeleton />
+      ) : error ? (
+        (() => {
+          const errorData = error.data as { correlationId?: string; userMessage?: string } | undefined;
+          return (
+            <ErrorDisplay
+              message={errorData?.userMessage ?? "Failed to load clients."}
+              correlationId={errorData?.correlationId}
+              onRetry={() => refetch()}
+            />
+          );
+        })()
+      ) : !data || data.items.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No clients found"
@@ -96,7 +106,7 @@ export function ClientList() {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 transition-opacity duration-200 ${isFetching ? "opacity-60" : ""}`}>
             {data.items.map((client, idx) => (
               <div
                 key={client.id}
@@ -183,22 +193,16 @@ export function ClientList() {
   );
 }
 
-function ClientListSkeleton() {
+function ClientListContentSkeleton() {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-10 flex-1 max-w-sm rounded-xl" />
-        <Skeleton className="h-10 w-[150px] rounded-xl" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border p-4 space-y-3">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-3 w-20" />
-          </div>
-        ))}
-      </div>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="rounded-2xl border p-4 space-y-3">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      ))}
     </div>
   );
 }

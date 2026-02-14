@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Briefcase } from "lucide-react";
+import { Briefcase, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ErrorDisplay } from "@/components/shared/error-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PaginationControls } from "@/components/shared/pagination-controls";
@@ -19,10 +21,14 @@ export function JobList() {
   const [experienceLevel, setExperienceLevel] = useState("all");
   const [sortBy, setSortBy] = useState("created_at");
 
+  // Debounce the search value so the query only fires 300ms after
+  // the user stops typing — prevents input unmount on every keystroke
+  const debouncedSearch = useDebouncedValue(search, 300);
+
   const queryInput = {
     page,
     pageSize,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: status !== "all" ? (status as "NEW") : undefined,
     jobType: jobType !== "all" ? (jobType as "HOURLY") : undefined,
     experienceLevel:
@@ -33,8 +39,12 @@ export function JobList() {
     sortDirection: "desc" as const,
   };
 
-  const { data, isLoading, error, refetch } =
-    trpc.job.list.useQuery(queryInput);
+  const { data, isLoading, isFetching, error, refetch } =
+    trpc.job.list.useQuery(queryInput, {
+      // Keep showing old results while the new query loads so the
+      // entire list doesn't flash to a skeleton on every filter change
+      placeholderData: keepPreviousData,
+    });
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
@@ -50,23 +60,7 @@ export function JobList() {
     setPage(1);
   }, []);
 
-  if (isLoading) {
-    return <JobListSkeleton />;
-  }
-
-  if (error) {
-    const errorData = error.data as
-      | { correlationId?: string; userMessage?: string }
-      | undefined;
-    return (
-      <ErrorDisplay
-        message={errorData?.userMessage ?? "Failed to load jobs."}
-        correlationId={errorData?.correlationId}
-        onRetry={() => refetch()}
-      />
-    );
-  }
-
+  // Filters are ALWAYS rendered — they must never unmount during loading
   return (
     <div className="space-y-4">
       <JobFilters
@@ -98,7 +92,31 @@ export function JobList() {
         onClearFilters={handleClearFilters}
       />
 
-      {!data || data.items.length === 0 ? (
+      {/* Subtle fetching indicator (doesn't replace content) */}
+      {isFetching && !isLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Updating results…
+        </div>
+      )}
+
+      {/* Initial load — no cached data at all */}
+      {isLoading ? (
+        <JobListContentSkeleton />
+      ) : error ? (
+        (() => {
+          const errorData = error.data as
+            | { correlationId?: string; userMessage?: string }
+            | undefined;
+          return (
+            <ErrorDisplay
+              message={errorData?.userMessage ?? "Failed to load jobs."}
+              correlationId={errorData?.correlationId}
+              onRetry={() => refetch()}
+            />
+          );
+        })()
+      ) : !data || data.items.length === 0 ? (
         <EmptyState
           icon={Briefcase}
           title="No jobs found"
@@ -120,7 +138,7 @@ export function JobList() {
         />
       ) : (
         <>
-          <div className="space-y-3">
+          <div className={`space-y-3 transition-opacity duration-200 ${isFetching ? "opacity-60" : ""}`}>
             {data.items.map((job, idx) => (
               <div
                 key={job.id}
@@ -147,18 +165,9 @@ export function JobList() {
   );
 }
 
-function JobListSkeleton() {
+function JobListContentSkeleton() {
   return (
-    <div className="space-y-4">
-      {/* Filter skeleton */}
-      <div className="flex gap-3">
-        <Skeleton className="h-10 flex-1" />
-        <Skeleton className="h-10 w-[150px]" />
-        <Skeleton className="h-10 w-[140px]" />
-        <Skeleton className="h-10 w-[160px]" />
-        <Skeleton className="h-10 w-[160px]" />
-      </div>
-      {/* Card skeletons */}
+    <div className="space-y-3">
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="rounded-2xl border p-4">
           <div className="flex items-start justify-between">

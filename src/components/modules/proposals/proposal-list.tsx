@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -79,6 +80,8 @@ export function ProposalList() {
     page,
     pageSize,
     status: status !== "all" ? (status as "DRAFT") : undefined,
+  }, {
+    placeholderData: keepPreviousData,
   });
 
   const handlePageSizeChange = useCallback((newSize: number) => {
