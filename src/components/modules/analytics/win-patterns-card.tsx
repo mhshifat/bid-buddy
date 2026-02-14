@@ -16,7 +16,6 @@ import {
   Loader2,
   ArrowUpRight,
   CheckCircle,
-  AlertCircle,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { toast } from "sonner";

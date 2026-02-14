@@ -96,6 +96,18 @@ async function persistInsight(
   });
 }
 
+/** Resolve a userId when ctx.userId is null (e.g. unauthenticated extension calls). */
+async function resolveDefaultUserId(prisma: PrismaClient): Promise<string> {
+  const user = await prisma.user.findFirst({ select: { id: true }, orderBy: { created_at: "asc" } });
+  if (!user) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "No user account found. Please sign in first.",
+    });
+  }
+  return user.id;
+}
+
 // ---------------------------------------------------------------------------
 // Helper types
 // ---------------------------------------------------------------------------
@@ -180,7 +192,6 @@ export const aiRouter = createRouter({
         });
       }
 
-      // TODO: Replace with actual tenant from auth context
       const tenantId = job.tenant_id;
 
       const aiService = getAiService();
@@ -343,8 +354,8 @@ export const aiRouter = createRouter({
 
       const aiService = getAiService();
 
-      // TODO: Replace with actual user from auth context
-      const userId = ctx.userId ?? "placeholder-user";
+      // Resolve the user creating this proposal
+      const userId = ctx.userId ?? (await resolveDefaultUserId(ctx.prisma as unknown as PrismaClient));
 
       const { proposalId, result } = await aiService.generateProposal(
         {
@@ -929,8 +940,9 @@ export const aiRouter = createRouter({
    * Analyse win/loss patterns from proposal history.
    */
   winPatterns: publicProcedure.mutation(async ({ ctx }) => {
+    // Also include SENT proposals so we can provide "pending" context to the AI
     const proposals = await ctx.prisma.proposal.findMany({
-      where: { status: { in: ["ACCEPTED", "REJECTED"] } },
+      where: { status: { in: ["ACCEPTED", "REJECTED", "SENT", "VIEWED", "SHORTLISTED"] } },
       include: { job: { select: { title: true, job_type: true, skills_required: true, category: true } } },
     });
 
@@ -957,6 +969,27 @@ export const aiRouter = createRouter({
         category: p.job.category,
         coverLetterLength: p.cover_letter.length,
       }));
+
+    // Guard: if zero concluded proposals, return a sensible default instead of burning AI tokens
+    if (winning.length === 0 && losing.length === 0) {
+      const pendingCount = proposals.length; // SENT / VIEWED / SHORTLISTED
+      const defaultResult = {
+        overallWinRate: 0,
+        patterns: [] as { pattern: string; confidence: "low"; impact: string; recommendation: string }[],
+        bestJobTypes: [] as string[],
+        bestSkillCombinations: [] as string[],
+        optimalRateRange: null,
+        optimalProposalLength: "Not enough data to determine",
+        topRecommendations: [
+          pendingCount > 0
+            ? `You have ${pendingCount} pending proposal${pendingCount > 1 ? "s" : ""} — wait for client responses to build your pattern data.`
+            : "Start sending proposals so we can track what works and what doesn't.",
+          "Focus on jobs that match your top skills for the highest win probability.",
+          "Keep your cover letters concise and specific to each job's requirements.",
+        ],
+      };
+      return defaultResult;
+    }
 
     const skills = await ctx.prisma.skill.findMany({ select: { name: true } });
 
@@ -1010,7 +1043,12 @@ export const aiRouter = createRouter({
       }
     }
 
-    const tenantId = upworkProfile?.tenant_id ?? skills[0]?.tenant_id ?? "";
+    // Resolve tenant from profile data or fall back to first available tenant
+    const tenantId =
+      upworkProfile?.tenant_id ??
+      skills[0]?.tenant_id ??
+      (await ctx.prisma.tenant.findFirst({ select: { id: true } }))?.id ??
+      null;
 
     const yearsExp: Record<string, number> = {};
     for (const s of skills) {
@@ -1030,7 +1068,7 @@ export const aiRouter = createRouter({
         totalProposals: totalSent,
         winRate,
       },
-      tenantId
+      tenantId ?? ""
     );
 
     if (tenantId) {
@@ -1284,15 +1322,17 @@ export const aiRouter = createRouter({
       return {
         status: status.healthy ? ("ok" as const) : ("degraded" as const),
         provider: status.provider,
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: status.model,
       };
     } catch (error) {
       logger.error("AI health check failed", error instanceof Error ? error : undefined);
-      return {
-        status: "error" as const,
-        provider: "groq",
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
-      };
+      // Read provider info without an API call so we don't hardcode names
+      try {
+        const info = getAiService().getProviderInfo();
+        return { status: "error" as const, provider: info.provider, model: info.model };
+      } catch {
+        return { status: "error" as const, provider: "unknown", model: "unknown" };
+      }
     }
   }),
 

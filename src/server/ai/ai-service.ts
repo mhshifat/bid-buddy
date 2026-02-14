@@ -789,9 +789,14 @@ export class AiService {
   /**
    * Checks if the AI provider is healthy and reachable.
    */
-  async healthCheck(): Promise<{ provider: string; healthy: boolean }> {
+  /** Returns the provider name and default model without making an API call. */
+  getProviderInfo(): { provider: string; model: string } {
+    return { provider: this.provider.name, model: this.provider.defaultModel };
+  }
+
+  async healthCheck(): Promise<{ provider: string; model: string; healthy: boolean }> {
     const healthy = await this.provider.healthCheck();
-    return { provider: this.provider.name, healthy };
+    return { provider: this.provider.name, model: this.provider.defaultModel, healthy };
   }
 }
 

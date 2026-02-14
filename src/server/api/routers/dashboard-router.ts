@@ -206,21 +206,23 @@ export const dashboardRouter = createRouter({
   connectsRoi: publicProcedure.query(async ({ ctx }) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
+    // Only count proposals that were actually submitted (not drafts/reviews)
     const proposals = await ctx.prisma.proposal.findMany({
-      where: { created_at: { gte: thirtyDaysAgo } },
+      where: {
+        created_at: { gte: thirtyDaysAgo },
+        status: { in: ["SENT", "VIEWED", "SHORTLISTED", "ACCEPTED", "REJECTED", "WITHDRAWN"] },
+      },
       select: { status: true, connects_used: true, job: { select: { job_type: true, category: true } } },
     });
-
-    type ProposalForRoi = typeof proposals[number];
 
     const byCategory: Record<string, { spent: number; sent: number; won: number }> = {};
 
     for (const p of proposals) {
-      const cat = (p as ProposalForRoi).job.category ?? (p as ProposalForRoi).job.job_type;
+      const cat = p.job.category ?? p.job.job_type;
       if (!byCategory[cat]) byCategory[cat] = { spent: 0, sent: 0, won: 0 };
       byCategory[cat].sent += 1;
-      byCategory[cat].spent += (p as ProposalForRoi).connects_used ?? 0;
-      if ((p as ProposalForRoi).status === "ACCEPTED") byCategory[cat].won += 1;
+      byCategory[cat].spent += p.connects_used ?? 0;
+      if (p.status === "ACCEPTED") byCategory[cat].won += 1;
     }
 
     const categories = Object.entries(byCategory).map(([category, data]) => ({
@@ -243,6 +245,72 @@ export const dashboardRouter = createRouter({
       totalProposalsWon: totalWon,
       overallWinRate: totalSent > 0 ? Math.round((totalWon / totalSent) * 100) : 0,
       avgCostPerWin: totalWon > 0 ? Math.round(totalSpent / totalWon) : null,
+    };
+  }),
+
+  /**
+   * Activity Trends — daily job capture + proposal counts for the last 30 days.
+   */
+  activityTrends: publicProcedure.query(async ({ ctx }) => {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [jobs, proposals] = await ctx.prisma.$transaction([
+      ctx.prisma.job.findMany({
+        where: { created_at: { gte: thirtyDaysAgo } },
+        select: { created_at: true },
+        orderBy: { created_at: "asc" },
+      }),
+      ctx.prisma.proposal.findMany({
+        where: {
+          created_at: { gte: thirtyDaysAgo },
+          status: { notIn: ["DRAFT", "REVIEW", "READY"] },
+        },
+        select: { created_at: true, status: true },
+        orderBy: { created_at: "asc" },
+      }),
+    ]);
+
+    // Build a map of day → counts
+    const dayMap: Record<string, { jobs: number; proposals: number; won: number }> = {};
+
+    // Initialise all 30 days so there are no gaps
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(thirtyDaysAgo.getTime() + i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
+      dayMap[key] = { jobs: 0, proposals: 0, won: 0 };
+    }
+
+    for (const j of jobs) {
+      const key = j.created_at.toISOString().slice(0, 10);
+      if (dayMap[key]) dayMap[key].jobs += 1;
+    }
+
+    for (const p of proposals) {
+      const key = p.created_at.toISOString().slice(0, 10);
+      if (dayMap[key]) {
+        dayMap[key].proposals += 1;
+        if (p.status === "ACCEPTED") dayMap[key].won += 1;
+      }
+    }
+
+    const days = Object.entries(dayMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, counts]) => ({
+        date,
+        label: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        ...counts,
+      }));
+
+    // Summary stats
+    const totalJobsCaptured = days.reduce((s, d) => s + d.jobs, 0);
+    const totalProposalsSent = days.reduce((s, d) => s + d.proposals, 0);
+    const totalWon = days.reduce((s, d) => s + d.won, 0);
+
+    return {
+      days,
+      totalJobsCaptured,
+      totalProposalsSent,
+      totalWon,
     };
   }),
 });
