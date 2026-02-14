@@ -127,6 +127,8 @@ export interface RelevantRepo {
   stars: number;
   /** AI-generated one-liner explaining why this repo is relevant to the job. */
   relevanceReason: string;
+  /** AI-generated brief summary of what the repo does based on available info. */
+  briefSummary: string;
 }
 
 export interface ProposalGenerationResult {

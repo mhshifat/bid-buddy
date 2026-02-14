@@ -200,7 +200,7 @@ export function AppSidebar() {
       {/* ----------------------------------------------------------------- */}
       {/* Bottom utility links                                              */}
       {/* ----------------------------------------------------------------- */}
-      <div className="mt-auto border-t px-2 pt-2">
+      <div className="mt-auto border-t px-2 py-2">
         <SidebarMenu>
           {BOTTOM_ITEMS.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />

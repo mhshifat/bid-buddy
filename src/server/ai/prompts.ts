@@ -189,13 +189,17 @@ Write a compelling, personalised cover letter. It should:
 5. Be 150-250 words maximum
 6. Sound natural and human, not template-like
 7. Never use phrases like "I am writing to express my interest"
-8. If relevant GitHub repos are found, naturally mention 1-2 repos in the cover letter as proof of relevant experience
+8. IMPORTANT: When mentioning any GitHub repo in the cover letter, you MUST include the full URL so the client can click and explore it. Format it naturally, e.g. "You can see my work in my Slack clone project (https://github.com/user/slack-clone-client) which demonstrates..."
 
-Also select up to 3 GitHub repositories from the provided list that are most relevant to this job. For each, provide a brief explanation of why it is relevant. If no repos are relevant or none were provided, return an empty array.
+Also select up to 3 GitHub repositories from the provided list that are most relevant to this job. For each:
+- Provide a "relevanceReason": a one-liner on why this repo matters for this specific job.
+- Provide a "briefSummary": a 2-3 sentence description of what the repo actually does and what technologies/patterns it demonstrates. Infer functionality from the repo name, description, language, and topics. Be specific — describe the features, architecture patterns, and tech stack used.
+
+If no repos are relevant or none were provided, return an empty array.
 
 Respond with a JSON object using this exact schema:
 {
-  "coverLetter": <string, the full proposal text>,
+  "coverLetter": <string, the full proposal text — MUST include clickable URLs when mentioning repos>,
   "proposedRate": <number | null, suggested rate in USD>,
   "proposedDuration": <string | null, estimated timeline>,
   "keySellingPoints": [<string, top 3-4 selling points used>],
@@ -208,7 +212,8 @@ Respond with a JSON object using this exact schema:
       "description": <string | null, repo description>,
       "language": <string | null, primary language>,
       "stars": <number, star count>,
-      "relevanceReason": <string, one-liner on why this repo is relevant to the job>
+      "relevanceReason": <string, one-liner on why this repo is relevant to the job>,
+      "briefSummary": <string, 2-3 sentences describing what this repo does, what features it includes, and what technologies/patterns it demonstrates>
     }
   ]
 }`;

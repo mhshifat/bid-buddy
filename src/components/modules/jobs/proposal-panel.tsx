@@ -35,6 +35,7 @@ import {
   Github,
   Star,
   ExternalLink,
+  Plus,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -62,6 +63,7 @@ interface RelevantRepoData {
   language: string | null;
   stars: number;
   relevanceReason: string;
+  briefSummary: string;
 }
 
 interface ProposalPanelProps {
@@ -126,6 +128,15 @@ export function ProposalPanel({
     generateMutation.mutate({ jobId });
   }, [jobId, generateMutation]);
 
+  const handleAppendRepoToProposal = useCallback((repo: RelevantRepoData) => {
+    setGeneratedContent((prev) => {
+      if (!prev) return prev;
+      const repoBlock = `\n\n📦 ${repo.name} — ${repo.url}\n${repo.briefSummary}`;
+      return { ...prev, coverLetter: prev.coverLetter + repoBlock };
+    });
+    toast.success(`"${repo.name}" added to proposal!`);
+  }, []);
+
   // -------------------------------------------------------------------------
   // Error state
   // -------------------------------------------------------------------------
@@ -158,15 +169,13 @@ export function ProposalPanel({
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Show generated result (freshly generated, with extra AI context)
-  // -------------------------------------------------------------------------
   if (generatedContent) {
     return (
       <div className="space-y-4">
         <GeneratedProposalView
           content={generatedContent}
           onRegenerate={handleGenerate}
+          onAppendRepo={handleAppendRepoToProposal}
         />
         {proposals.length > 0 && (
           <>
@@ -232,11 +241,13 @@ interface GeneratedProposalViewProps {
     relevantRepos: RelevantRepoData[];
   };
   onRegenerate: () => void;
+  onAppendRepo: (repo: RelevantRepoData) => void;
 }
 
 function GeneratedProposalView({
   content,
   onRegenerate,
+  onAppendRepo,
 }: GeneratedProposalViewProps) {
   const [copied, setCopied] = useState(false);
 
@@ -278,9 +289,9 @@ function GeneratedProposalView({
           </div>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {content.coverLetter}
-          </p>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            <LinkedText text={content.coverLetter} />
+          </div>
         </CardContent>
       </Card>
 
@@ -345,7 +356,11 @@ function GeneratedProposalView({
           <CardContent>
             <div className="space-y-3">
               {content.relevantRepos.map((repo) => (
-                <RelevantRepoCard key={repo.fullName} repo={repo} />
+                <RelevantRepoCard
+                  key={repo.fullName}
+                  repo={repo}
+                  onAddToProposal={onAppendRepo}
+                />
               ))}
             </div>
           </CardContent>
@@ -484,18 +499,77 @@ function SavedProposalCard({ proposal }: { proposal: ProposalData }) {
 }
 
 // ---------------------------------------------------------------------------
+// Linked Text — auto-detects URLs in plain text and makes them clickable
+// ---------------------------------------------------------------------------
+
+function LinkedText({ text }: { text: string }) {
+  // Split on URLs — capturing group makes matched URLs appear at odd indices
+  const parts = text.split(/(https?:\/\/[^\s)]+)/g);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        // Odd indices are the captured URL groups
+        i % 2 === 1 ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-violet-600 underline underline-offset-2 transition-colors hover:text-violet-500 dark:text-violet-400 dark:hover:text-violet-300"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Relevant GitHub Repo Card
 // ---------------------------------------------------------------------------
 
-function RelevantRepoCard({ repo }: { repo: RelevantRepoData }) {
-  const [copied, setCopied] = useState(false);
+interface RelevantRepoCardProps {
+  repo: RelevantRepoData;
+  onAddToProposal: (repo: RelevantRepoData) => void;
+}
 
-  const handleCopyUrl = useCallback(async () => {
-    await navigator.clipboard.writeText(repo.url);
+function RelevantRepoCard({ repo, onAddToProposal }: RelevantRepoCardProps) {
+  const [copied, setCopied] = useState(false);
+  const [added, setAdded] = useState(false);
+
+  /** Builds a formatted text block with name, link, and description. */
+  const buildFormattedText = useCallback(() => {
+    const lines = [
+      `📦 ${repo.fullName}`,
+      `🔗 ${repo.url}`,
+    ];
+    if (repo.language) {
+      lines.push(`🛠 Language: ${repo.language}`);
+    }
+    if (repo.briefSummary) {
+      lines.push(`📝 ${repo.briefSummary}`);
+    }
+    return lines.join("\n");
+  }, [repo]);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(buildFormattedText());
     setCopied(true);
-    toast.success("Repo URL copied!");
+    toast.success("Repo details copied!", {
+      description: "Name, link, and description copied to clipboard.",
+    });
     setTimeout(() => setCopied(false), 2000);
-  }, [repo.url]);
+  }, [buildFormattedText]);
+
+  const handleAddToProposal = useCallback(() => {
+    onAddToProposal(repo);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2500);
+  }, [repo, onAddToProposal]);
 
   return (
     <div className="group relative overflow-hidden rounded-xl border bg-gradient-to-br from-card to-card p-4 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
@@ -504,40 +578,54 @@ function RelevantRepoCard({ repo }: { repo: RelevantRepoData }) {
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          {/* Repo name + language badge */}
-          <div className="flex items-center gap-2">
+          {/* Repo name as clickable link + language badge */}
+          <div className="flex items-center gap-2 flex-wrap">
             <Github className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate text-sm font-semibold text-foreground">
+            <a
+              href={repo.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate text-sm font-semibold text-foreground underline decoration-violet-500/40 underline-offset-2 transition-colors hover:text-violet-600 dark:hover:text-violet-400"
+            >
               {repo.fullName}
-            </span>
+            </a>
             {repo.language && (
               <Badge variant="secondary" className="shrink-0 text-[10px]">
                 {repo.language}
               </Badge>
             )}
+            {repo.stars > 0 && (
+              <span className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
+                <Star className="h-3 w-3 text-amber-500" />
+                {repo.stars}
+              </span>
+            )}
           </div>
 
-          {/* Description */}
-          {repo.description && (
-            <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
-              {repo.description}
-            </p>
+          {/* Clickable URL for easy copying / visibility */}
+          <a
+            href={repo.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground/70 transition-colors hover:text-violet-600 dark:hover:text-violet-400"
+          >
+            <ExternalLink className="h-3 w-3" />
+            {repo.url}
+          </a>
+
+          {/* AI Brief Summary — what the repo actually does */}
+          {repo.briefSummary && (
+            <div className="mt-2.5 rounded-lg bg-muted/50 px-3 py-2">
+              <p className="text-xs leading-relaxed text-foreground/80">
+                {repo.briefSummary}
+              </p>
+            </div>
           )}
 
           {/* Relevance reason */}
           <p className="mt-2 text-xs font-medium text-violet-600 dark:text-violet-400">
             💡 {repo.relevanceReason}
           </p>
-
-          {/* Stars */}
-          <div className="mt-2 flex items-center gap-3">
-            {repo.stars > 0 && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Star className="h-3 w-3 text-amber-500" />
-                {repo.stars}
-              </span>
-            )}
-          </div>
         </div>
 
         {/* Actions */}
@@ -561,7 +649,7 @@ function RelevantRepoCard({ repo }: { repo: RelevantRepoData }) {
                 variant="ghost"
                 size="sm"
                 className="h-7 w-7 p-0"
-                onClick={handleCopyUrl}
+                onClick={handleCopy}
               >
                 {copied ? (
                   <Check className="h-3.5 w-3.5 text-emerald-600" />
@@ -570,7 +658,27 @@ function RelevantRepoCard({ repo }: { repo: RelevantRepoData }) {
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Copy repo URL</TooltipContent>
+            <TooltipContent>Copy name, link &amp; description</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={handleAddToProposal}
+                disabled={added}
+              >
+                {added ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {added ? "Added!" : "Add to proposal"}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>

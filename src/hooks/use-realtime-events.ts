@@ -119,6 +119,9 @@ function handleSseMessage(event: MessageEvent<string>): void {
 }
 
 function connect(tenantId?: string): void {
+  // EventSource is browser-only — bail during SSR
+  if (typeof EventSource === "undefined") return;
+
   // Close existing connection
   disconnect();
 
@@ -202,13 +205,16 @@ function getSnapshot(): RealtimeStore {
   return store;
 }
 
+// Cached to satisfy React's requirement that getServerSnapshot returns a stable reference
+const SERVER_SNAPSHOT: RealtimeStore = {
+  status: "disconnected",
+  notifications: [],
+  unreadCount: 0,
+  lastEvent: null,
+};
+
 function getServerSnapshot(): RealtimeStore {
-  return {
-    status: "disconnected",
-    notifications: [],
-    unreadCount: 0,
-    lastEvent: null,
-  };
+  return SERVER_SNAPSHOT;
 }
 
 // ============================================================================
