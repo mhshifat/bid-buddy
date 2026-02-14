@@ -5,7 +5,7 @@
  * client before committing. Uncovers hidden scope, risks, and expectations.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,7 +84,6 @@ const priorityColors: Record<string, string> = {
 
 export function DiscoveryQuestionsPanel({ jobId }: DiscoveryQuestionsPanelProps) {
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<DiscoveryData | null>(null);
   const [templateCopied, setTemplateCopied] = useState(false);
 
   // Load cached result on mount
@@ -93,19 +92,10 @@ export function DiscoveryQuestionsPanel({ jobId }: DiscoveryQuestionsPanelProps)
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as DiscoveryData);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.discoveryQuestions.useMutation({
-    onSuccess: (data) => {
-      setResult(data);
+    onSuccess: () => {
       setError(null);
-      toast.success("Discovery questions ready!", {
-        description: `${data.questions.length} strategic questions generated.`,
-      });
+      toast.success("Discovery questions ready!");
     },
     onError: (err) => {
       const errorData = err.data as { userMessage?: string } | undefined;
@@ -116,9 +106,13 @@ export function DiscoveryQuestionsPanel({ jobId }: DiscoveryQuestionsPanelProps)
     },
   });
 
+  const result: DiscoveryData | null =
+    (mutation.data as DiscoveryData | undefined) ??
+    (cached?.result as DiscoveryData | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
     setError(null);
-    setResult(null);
     mutation.mutate({ jobId });
   }, [jobId, mutation]);
 

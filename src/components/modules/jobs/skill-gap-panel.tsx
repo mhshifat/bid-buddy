@@ -5,7 +5,7 @@
  * Shows readiness level, specific gaps, and a learning plan.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +25,6 @@ import {
   GraduationCap,
   Star,
   Clock,
-  ExternalLink,
   TrendingUp,
   Lightbulb,
 } from "lucide-react";
@@ -43,7 +42,7 @@ interface SkillGapItem {
   requiredLevel: string;
   importance: "critical" | "important" | "nice-to-have";
   estimatedLearningTime: string;
-  resources: { title: string; type: string; url?: string }[];
+  resources: { title: string; type: string }[];
   quickWin: string;
 }
 
@@ -111,7 +110,6 @@ const resourceTypeIcons: Record<string, React.ReactNode> = {
 
 export function SkillGapPanel({ jobId }: SkillGapPanelProps) {
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<SkillGapData | null>(null);
 
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
@@ -119,19 +117,10 @@ export function SkillGapPanel({ jobId }: SkillGapPanelProps) {
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as SkillGapData);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.skillGap.useMutation({
-    onSuccess: (data) => {
-      setResult(data);
+    onSuccess: () => {
       setError(null);
-      toast.success("Skill gap analysis complete!", {
-        description: `Overall readiness: ${data.overallReadiness}%`,
-      });
+      toast.success("Skill gap analysis complete!");
     },
     onError: (err) => {
       const errorData = err.data as { userMessage?: string } | undefined;
@@ -144,9 +133,13 @@ export function SkillGapPanel({ jobId }: SkillGapPanelProps) {
     },
   });
 
+  const result: SkillGapData | null =
+    (mutation.data as SkillGapData | undefined) ??
+    (cached?.result as SkillGapData | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
     setError(null);
-    setResult(null);
     mutation.mutate({ jobId });
   }, [jobId, mutation]);
 
@@ -400,19 +393,7 @@ function SkillGapCard({ gap }: { gap: SkillGapItem }) {
                       {resourceTypeIcons[res.type] ?? (
                         <BookOpen className="h-3 w-3" />
                       )}
-                      {res.url ? (
-                        <a
-                          href={res.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-primary hover:underline"
-                        >
-                          {res.title}
-                          <ExternalLink className="h-2.5 w-2.5" />
-                        </a>
-                      ) : (
-                        <span>{res.title}</span>
-                      )}
+                      <span>{res.title}</span>
                       <Badge
                         variant="outline"
                         className="ml-auto text-[9px]"

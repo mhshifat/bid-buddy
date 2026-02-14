@@ -6,7 +6,7 @@
  * Helps freelancers avoid underquoting and scope creep.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,8 +116,6 @@ const complexityColors: Record<string, string> = {
 
 export function ScopeEstimatorPanel({ jobId, jobTitle, jobDescription }: ScopeEstimatorPanelProps) {
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ScopeData | null>(null);
-  const [scopeProtected, setScopeProtected] = useState(false);
 
   // Check if a scope already exists for this job
   const { data: existingScopes } = trpc.scope.list.useQuery(undefined, {
@@ -125,11 +123,8 @@ export function ScopeEstimatorPanel({ jobId, jobTitle, jobDescription }: ScopeEs
     refetchOnWindowFocus: false,
   });
 
-  useEffect(() => {
-    if (existingScopes?.some((s) => s.job_id === jobId)) {
-      setScopeProtected(true);
-    }
-  }, [existingScopes, jobId]);
+  // Derive scope-protected status from query data directly
+  const scopeProtected = existingScopes?.some((s) => s.job_id === jobId) ?? false;
 
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
@@ -137,16 +132,12 @@ export function ScopeEstimatorPanel({ jobId, jobTitle, jobDescription }: ScopeEs
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as ScopeData);
-    }
-  }, [cached, result]);
+  const utils = trpc.useUtils();
 
   // Quick-protect: auto-create scope from AI estimate in one click
   const quickProtectMutation = trpc.scope.createFromEstimate.useMutation({
     onSuccess: () => {
-      setScopeProtected(true);
+      void utils.scope.list.invalidate();
       toast.success("Scope Shield activated!", {
         description: "Project scope auto-created from AI estimate. Go to Scope Shield to manage it.",
       });
@@ -217,7 +208,6 @@ export function ScopeEstimatorPanel({ jobId, jobTitle, jobDescription }: ScopeEs
 
   const mutation = trpc.ai.scopeEstimate.useMutation({
     onSuccess: (data) => {
-      setResult(data);
       setError(null);
       toast.success("Scope estimate ready!", {
         description: `${data.tasks.length} tasks, ${data.totalHoursMin}–${data.totalHoursMax}h estimated.`,
@@ -232,9 +222,13 @@ export function ScopeEstimatorPanel({ jobId, jobTitle, jobDescription }: ScopeEs
     },
   });
 
+  const result: ScopeData | null =
+    (mutation.data as ScopeData | undefined) ??
+    (cached?.result as ScopeData | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
     setError(null);
-    setResult(null);
     mutation.mutate({ jobId });
   }, [jobId, mutation]);
 
@@ -307,7 +301,7 @@ export function ScopeEstimatorPanel({ jobId, jobTitle, jobDescription }: ScopeEs
               <DefineScopeDialog
                 jobId={jobId}
                 initialData={buildInitialData()}
-                onCreated={() => setScopeProtected(true)}
+                onCreated={() => void utils.scope.list.invalidate()}
                 trigger={
                   <Button variant="outline" size="sm">
                     <ShieldPlus className="mr-1.5 h-3.5 w-3.5" />

@@ -5,7 +5,7 @@
  * glass-morphism, and AI-powered performance analysis.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, TrendingUp, TrendingDown, Minus, CheckCircle } from "lucide-react";
@@ -28,23 +28,14 @@ const trendIcons: Record<string, React.ReactNode> = {
 };
 
 export function WeeklyDigestWidget() {
-  const [result, setResult] = useState<WeeklyDigestResult | null>(null);
-
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
     { insightType: "WEEKLY_DIGEST" },
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as WeeklyDigestResult);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.weeklyDigest.useMutation({
     onSuccess: (data) => {
-      setResult(data);
       toast.success("Weekly digest ready!", {
         description: `Grade: ${data.weeklyGrade} — ${data.trendDirection}`,
       });
@@ -54,8 +45,12 @@ export function WeeklyDigestWidget() {
     },
   });
 
+  const result: WeeklyDigestResult | null =
+    (mutation.data as WeeklyDigestResult | undefined) ??
+    (cached?.result as WeeklyDigestResult | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
-    setResult(null);
     mutation.mutate();
   }, [mutation]);
 

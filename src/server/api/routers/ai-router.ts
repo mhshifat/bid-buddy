@@ -1177,6 +1177,7 @@ export const aiRouter = createRouter({
     const aiService = getAiService();
     const { result } = await aiService.generateSmartAlerts({
       recentJobs: recentJobs.map((j) => ({
+        id: j.id,
         title: j.title,
         fitScore: j.analyses[0]?.fit_score ?? null,
         winProbability: j.analyses[0]?.win_probability ?? null,
@@ -1185,6 +1186,8 @@ export const aiRouter = createRouter({
         budgetMax: j.budget_max ? Number(j.budget_max) : null,
       })),
       pendingProposals: pendingProposals.map((p) => ({
+        proposalId: p.id,
+        jobId: p.job_id,
         jobTitle: p.job.title,
         daysSinceSubmission: Math.floor(
           (Date.now() - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24)

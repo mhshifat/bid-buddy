@@ -5,7 +5,7 @@
  * glass-morphism, staggered animations, and AI-powered insights.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,27 +64,24 @@ function getAlertIcon(type: SmartAlert["type"]) {
 }
 
 export function SmartAlertsWidget() {
-  const [result, setResult] = useState<SmartAlertResult | null>(null);
-
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
     { insightType: "SMART_ALERTS" },
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as SmartAlertResult);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.smartAlerts.useMutation({
     onSuccess: (data) => {
-      setResult(data);
       toast.success(`${data.alerts.length} smart alerts generated!`);
     },
     onError: () => toast.error("Failed to generate smart alerts"),
   });
+
+  // Derive result: mutation data takes priority over cached data
+  const result: SmartAlertResult | null =
+    (mutation.data as SmartAlertResult | undefined) ??
+    (cached?.result as SmartAlertResult | undefined) ??
+    null;
 
   const handleGenerate = useCallback(() => {
     mutation.mutate();

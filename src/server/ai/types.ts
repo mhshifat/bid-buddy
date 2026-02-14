@@ -255,7 +255,7 @@ export interface SkillGapItem {
   requiredLevel: "beginner" | "intermediate" | "advanced" | "expert";
   importance: "critical" | "important" | "nice-to-have";
   estimatedLearningTime: string;
-  resources: { title: string; type: "course" | "docs" | "tutorial" | "practice"; url?: string }[];
+  resources: { title: string; type: "course" | "docs" | "tutorial" | "practice" }[];
   quickWin: string;
 }
 
@@ -610,6 +610,7 @@ export interface ClientIntelligenceResult {
 
 export interface SmartAlertInput {
   recentJobs: {
+    id: string;
     title: string;
     fitScore: number | null;
     winProbability: number | null;
@@ -618,6 +619,8 @@ export interface SmartAlertInput {
     budgetMax: number | null;
   }[];
   pendingProposals: {
+    proposalId: string;
+    jobId: string;
     jobTitle: string;
     daysSinceSubmission: number;
     status: string;

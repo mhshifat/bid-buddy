@@ -5,7 +5,7 @@
  * Helps freelancers prepare for client discovery calls.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,7 +81,6 @@ const difficultyColors: Record<string, string> = {
 
 export function InterviewPrepPanel({ jobId }: InterviewPrepPanelProps) {
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<InterviewPrepData | null>(null);
 
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
@@ -89,19 +88,10 @@ export function InterviewPrepPanel({ jobId }: InterviewPrepPanelProps) {
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as InterviewPrepData);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.interviewPrep.useMutation({
-    onSuccess: (data) => {
-      setResult(data);
+    onSuccess: () => {
       setError(null);
-      toast.success("Interview prep ready!", {
-        description: `${data.questions.length} questions generated.`,
-      });
+      toast.success("Interview prep ready!");
     },
     onError: (err) => {
       const errorData = err.data as { userMessage?: string } | undefined;
@@ -112,9 +102,13 @@ export function InterviewPrepPanel({ jobId }: InterviewPrepPanelProps) {
     },
   });
 
+  const result: InterviewPrepData | null =
+    (mutation.data as InterviewPrepData | undefined) ??
+    (cached?.result as InterviewPrepData | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
     setError(null);
-    setResult(null);
     mutation.mutate({ jobId });
   }, [jobId, mutation]);
 

@@ -5,7 +5,7 @@
  * Builds a comprehensive profile from the job's embedded client data.
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -83,7 +83,6 @@ function getTrustBg(score: number): string {
 // ---------------------------------------------------------------------------
 
 export function ClientIntelligencePanel({ jobId }: ClientIntelligencePanelProps) {
-  const [result, setResult] = useState<ClientIntelligenceResult | null>(null);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   // Load cached result on mount
@@ -92,15 +91,8 @@ export function ClientIntelligencePanel({ jobId }: ClientIntelligencePanelProps)
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as ClientIntelligenceResult);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.clientIntelligenceFromJob.useMutation({
-    onSuccess: (data) => {
-      setResult(data);
+    onSuccess: () => {
       toast.success("Client intelligence report ready!");
     },
     onError: (error) => {
@@ -110,6 +102,11 @@ export function ClientIntelligencePanel({ jobId }: ClientIntelligencePanelProps)
       });
     },
   });
+
+  const result: ClientIntelligenceResult | null =
+    (mutation.data as ClientIntelligenceResult | undefined) ??
+    (cached?.result as ClientIntelligenceResult | undefined) ??
+    null;
 
   const handleCopy = (text: string, section: string) => {
     navigator.clipboard.writeText(text);

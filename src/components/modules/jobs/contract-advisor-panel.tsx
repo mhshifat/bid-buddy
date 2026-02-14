@@ -6,7 +6,7 @@
  * unfavorable terms.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +93,6 @@ const riskBorderColors: Record<string, string> = {
 
 export function ContractAdvisorPanel({ jobId }: ContractAdvisorPanelProps) {
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ContractData | null>(null);
 
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
@@ -101,15 +100,8 @@ export function ContractAdvisorPanel({ jobId }: ContractAdvisorPanelProps) {
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as ContractData);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.contractAdvisor.useMutation({
     onSuccess: (data) => {
-      setResult(data);
       setError(null);
       toast.success("Contract advice ready!", {
         description: `Risk level: ${data.overallRiskLevel.toUpperCase()}`,
@@ -124,9 +116,13 @@ export function ContractAdvisorPanel({ jobId }: ContractAdvisorPanelProps) {
     },
   });
 
+  const result: ContractData | null =
+    (mutation.data as ContractData | undefined) ??
+    (cached?.result as ContractData | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
     setError(null);
-    setResult(null);
     mutation.mutate({ jobId });
   }, [jobId, mutation]);
 

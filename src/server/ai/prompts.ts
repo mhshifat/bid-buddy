@@ -1093,14 +1093,14 @@ export function buildSmartAlertPrompt(
   const recentJobsList = input.recentJobs
     .map(
       (j, i) =>
-        `${i + 1}. "${j.title}" (Fit: ${j.fitScore ?? "N/A"}, Win: ${j.winProbability ?? "N/A"}%, Budget: ${j.budgetMax ? `$${j.budgetMax}` : "N/A"}, Skills: ${j.skillsRequired.join(", ")}, Posted: ${j.postedAt ?? "Unknown"})`
+        `${i + 1}. [ID: ${j.id}] "${j.title}" (Fit: ${j.fitScore ?? "N/A"}, Win: ${j.winProbability ?? "N/A"}%, Budget: ${j.budgetMax ? `$${j.budgetMax}` : "N/A"}, Skills: ${j.skillsRequired.join(", ")}, Posted: ${j.postedAt ?? "Unknown"})`
     )
     .join("\n");
 
   const pendingList = input.pendingProposals
     .map(
       (p, i) =>
-        `${i + 1}. "${p.jobTitle}" — ${p.daysSinceSubmission} days ago, status: ${p.status}`
+        `${i + 1}. [JobID: ${p.jobId}, ProposalID: ${p.proposalId}] "${p.jobTitle}" — ${p.daysSinceSubmission} days ago, status: ${p.status}`
     )
     .join("\n");
 
@@ -1127,6 +1127,8 @@ Generate 3-8 prioritised alerts based on the data. Focus on:
 5. Milestones and encouragement when performance is good
 6. Quick tactical tips based on current pipeline state
 
+CRITICAL: For actionUrl, you MUST use the EXACT IDs provided in the data above. Use "/jobs/{ID}" for job-related alerts and "/jobs/{JobID}" for proposal-related alerts. Do NOT invent or guess IDs. If an alert is general (like a tip or market-shift) and doesn't link to a specific item, set actionUrl to null.
+
 Respond with a JSON object using this exact schema:
 {
   "alerts": [
@@ -1136,7 +1138,7 @@ Respond with a JSON object using this exact schema:
       "title": <string, short alert title>,
       "message": <string, 1-3 sentence actionable message>,
       "actionLabel": <string | null, button label like "View Job" or "Send Follow-Up">,
-      "actionUrl": <string | null, relative URL like "/jobs/123" or null if not applicable>
+      "actionUrl": <string | null, relative URL using exact IDs from above e.g. "/jobs/abc123-def456" or null>
     }
   ],
   "summary": <string, 1-2 sentence overview of the freelancer's current state>,

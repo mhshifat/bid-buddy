@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -45,30 +45,25 @@ const confidenceColors: Record<string, string> = {
 };
 
 export function WinPatternsCard() {
-  const [result, setResult] = useState<WinPatternResult | null>(null);
-
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
     { insightType: "WIN_PATTERNS" },
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as WinPatternResult);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.winPatterns.useMutation({
     onSuccess: (data) => {
-      setResult(data);
       toast.success("Win patterns analyzed!", { description: `${data.patterns.length} patterns found` });
     },
     onError: () => toast.error("Failed to analyze patterns"),
   });
 
+  const result: WinPatternResult | null =
+    (mutation.data as WinPatternResult | undefined) ??
+    (cached?.result as WinPatternResult | undefined) ??
+    null;
+
   const handleAnalyze = useCallback(() => {
-    setResult(null);
     mutation.mutate();
   }, [mutation]);
 

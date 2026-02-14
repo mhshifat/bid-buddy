@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -163,7 +163,6 @@ export function ProposalList() {
 function ProposalCard({ proposal }: { proposal: ProposalItem }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [followUp, setFollowUp] = useState<string | null>(null);
   const [showFollowUp, setShowFollowUp] = useState(false);
 
   // Load cached follow-up on mount
@@ -172,18 +171,8 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cachedFollowUp?.result && !followUp) {
-      const cached = cachedFollowUp.result as { message?: string };
-      if (cached.message) {
-        setFollowUp(cached.message);
-      }
-    }
-  }, [cachedFollowUp, followUp]);
-
   const followUpMutation = trpc.ai.followUpMessage.useMutation({
-    onSuccess: (data) => {
-      setFollowUp(data.message);
+    onSuccess: () => {
       setShowFollowUp(true);
       toast.success("Follow-up message generated!");
     },
@@ -191,6 +180,12 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
       toast.error("Failed to generate follow-up");
     },
   });
+
+  // Derive follow-up: mutation data takes priority, then cached
+  const followUp: string | null =
+    (followUpMutation.data as { message?: string } | undefined)?.message ??
+    (cachedFollowUp?.result as { message?: string } | undefined)?.message ??
+    null;
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(proposal.coverLetter);

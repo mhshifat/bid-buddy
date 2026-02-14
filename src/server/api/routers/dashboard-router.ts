@@ -158,8 +158,6 @@ export const dashboardRouter = createRouter({
             hourly_rate_max: true,
             job_type: true,
             estimated_duration: true,
-          },
-          include: {
             analyses: {
               take: 1,
               orderBy: { created_at: "desc" },
@@ -173,7 +171,7 @@ export const dashboardRouter = createRouter({
     type PipelineProposal = typeof proposals[number];
 
     const pipelineItems = proposals.map((p: PipelineProposal) => {
-      const winProb = (p.job as unknown as { analyses: { win_probability: number | null }[] }).analyses?.[0]?.win_probability ?? 30;
+      const winProb = p.job.analyses?.[0]?.win_probability ?? 30;
       const estimatedValue = p.proposed_rate
         ? Number(p.proposed_rate)
         : p.job.budget_max

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -63,7 +63,6 @@ const vocabColors: Record<string, string> = {
 };
 
 export function StyleTrainerCard() {
-  const [result, setResult] = useState<StyleTrainerResult | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -73,16 +72,8 @@ export function StyleTrainerCard() {
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as StyleTrainerResult);
-      setExpanded(true);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.styleTrainer.useMutation({
-    onSuccess: (data) => {
-      setResult(data);
+    onSuccess: () => {
       setExpanded(true);
       toast.success("Writing style analysis complete!");
     },
@@ -95,8 +86,12 @@ export function StyleTrainerCard() {
     },
   });
 
+  const result: StyleTrainerResult | null =
+    (mutation.data as StyleTrainerResult | undefined) ??
+    (cached?.result as StyleTrainerResult | undefined) ??
+    null;
+
   const handleAnalyze = useCallback(() => {
-    setResult(null);
     mutation.mutate();
   }, [mutation]);
 

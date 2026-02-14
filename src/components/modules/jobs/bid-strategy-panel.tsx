@@ -5,7 +5,7 @@
  * Provides pricing, positioning, and timing advice.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,7 +79,6 @@ const urgencyLabels: Record<string, string> = {
 
 export function BidStrategyPanel({ jobId }: BidStrategyPanelProps) {
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<BidStrategyData | null>(null);
   const [hookCopied, setHookCopied] = useState(false);
 
   // Load cached result on mount
@@ -88,15 +87,8 @@ export function BidStrategyPanel({ jobId }: BidStrategyPanelProps) {
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as BidStrategyData);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.bidStrategy.useMutation({
-    onSuccess: (data) => {
-      setResult(data);
+    onSuccess: () => {
       setError(null);
       toast.success("Bid strategy ready!");
     },
@@ -109,9 +101,13 @@ export function BidStrategyPanel({ jobId }: BidStrategyPanelProps) {
     },
   });
 
+  const result: BidStrategyData | null =
+    (mutation.data as BidStrategyData | undefined) ??
+    (cached?.result as BidStrategyData | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
     setError(null);
-    setResult(null);
     mutation.mutate({ jobId });
   }, [jobId, mutation]);
 

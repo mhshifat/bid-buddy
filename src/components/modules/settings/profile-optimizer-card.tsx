@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -61,7 +61,6 @@ function getScoreColor(score: number): string {
 }
 
 export function ProfileOptimizerCard() {
-  const [result, setResult] = useState<ProfileOptimizerResult | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -71,16 +70,8 @@ export function ProfileOptimizerCard() {
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as ProfileOptimizerResult);
-      setExpanded(true);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.profileOptimizer.useMutation({
     onSuccess: (data) => {
-      setResult(data);
       setExpanded(true);
       toast.success("Profile analysis complete!", {
         description: `Score: ${data.overallScore}/100`,
@@ -89,8 +80,12 @@ export function ProfileOptimizerCard() {
     onError: () => toast.error("Failed to analyze profile"),
   });
 
+  const result: ProfileOptimizerResult | null =
+    (mutation.data as ProfileOptimizerResult | undefined) ??
+    (cached?.result as ProfileOptimizerResult | undefined) ??
+    null;
+
   const handleOptimize = useCallback(() => {
-    setResult(null);
     mutation.mutate();
   }, [mutation]);
 

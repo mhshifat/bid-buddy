@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -59,23 +59,14 @@ interface ProposalVariationsPanelProps {
 }
 
 export function ProposalVariationsPanel({ jobId }: ProposalVariationsPanelProps) {
-  const [result, setResult] = useState<ProposalVariationsResult | null>(null);
-
   // Load cached result on mount
   const { data: cached } = trpc.ai.getCachedInsight.useQuery(
     { insightType: "PROPOSAL_VARIATIONS", jobId },
     { staleTime: Infinity, refetchOnWindowFocus: false }
   );
 
-  useEffect(() => {
-    if (cached?.result && !result) {
-      setResult(cached.result as ProposalVariationsResult);
-    }
-  }, [cached, result]);
-
   const mutation = trpc.ai.proposalVariations.useMutation({
     onSuccess: (data) => {
-      setResult(data);
       toast.success("Proposal variations generated!", {
         description: `${data.variations.length} tone variations created`,
       });
@@ -83,8 +74,12 @@ export function ProposalVariationsPanel({ jobId }: ProposalVariationsPanelProps)
     onError: () => toast.error("Failed to generate variations"),
   });
 
+  const result: ProposalVariationsResult | null =
+    (mutation.data as ProposalVariationsResult | undefined) ??
+    (cached?.result as ProposalVariationsResult | undefined) ??
+    null;
+
   const handleGenerate = useCallback(() => {
-    setResult(null);
     mutation.mutate({ jobId });
   }, [mutation, jobId]);
 
