@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Briefcase, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -11,6 +11,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { JobCard } from "./job-card";
 import { JobFilters } from "./job-filters";
+
+const LAST_VISITED_KEY = "last-visited-job-id";
 
 export function JobList() {
   const [page, setPage] = useState(1);
@@ -59,6 +61,39 @@ export function JobList() {
     setPageSize(newSize);
     setPage(1);
   }, []);
+
+  // ---- Scroll-to-card & glow on return from detail page ----
+  const scrollRestoredRef = useRef(false);
+
+  useEffect(() => {
+    // Only run once when data first loads (not on filter changes)
+    if (scrollRestoredRef.current || !data?.items.length) return;
+
+    const lastVisitedId = sessionStorage.getItem(LAST_VISITED_KEY);
+    if (!lastVisitedId) return;
+
+    // Clear immediately so it doesn't trigger again on filter / page changes
+    sessionStorage.removeItem(LAST_VISITED_KEY);
+    scrollRestoredRef.current = true;
+
+    // Allow the DOM to paint the card list first
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-job-id="${lastVisitedId}"]`
+      );
+      if (!el) return;
+
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("animate-return-glow");
+
+      // Remove animation class after it finishes so it doesn't replay
+      const cleanup = () => {
+        el.classList.remove("animate-return-glow");
+        el.removeEventListener("animationend", cleanup);
+      };
+      el.addEventListener("animationend", cleanup);
+    });
+  }, [data?.items.length]);
 
   // Filters are ALWAYS rendered — they must never unmount during loading
   return (

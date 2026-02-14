@@ -11,6 +11,7 @@ import { AiRepository } from "@/server/ai/ai-repository";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events";
 import { generateCorrelationId } from "@/server/lib/correlation-id";
+import { JourneyService } from "@/server/journey/journey-service";
 import type { AiAnalysis, Job, InsightType, PrismaClient } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
@@ -371,6 +372,22 @@ export const aiRouter = createRouter({
         jobTitle: job.title,
         aiGenerated: true,
       }, tenantId);
+
+      // Journey tracking: log DRAFT activity + advance job to BIDDING
+      try {
+        const journeyService = new JourneyService(ctx.prisma as unknown as PrismaClient);
+        await journeyService.onProposalStatusChanged({
+          tenantId,
+          proposalId,
+          jobId: job.id,
+          oldStatus: "DRAFT", // newly created
+          newStatus: "DRAFT",
+          jobTitle: job.title,
+        });
+      } catch (err) {
+        // Non-critical — don't fail proposal generation if journey logging fails
+        logger.error("Failed to log journey for new proposal", err instanceof Error ? err : undefined);
+      }
 
       return {
         proposalId,

@@ -36,6 +36,7 @@ import {
   Star,
   ExternalLink,
   Plus,
+  Send,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { ErrorDisplay } from "@/components/shared/error-display";
@@ -83,6 +84,7 @@ export function ProposalPanel({
 }: ProposalPanelProps) {
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [errorCorrelationId, setErrorCorrelationId] = useState<string | undefined>();
+  const [generatedProposalId, setGeneratedProposalId] = useState<string | null>(null);
   const [generatedContent, setGeneratedContent] = useState<{
     coverLetter: string;
     proposedRate: number | null;
@@ -94,6 +96,7 @@ export function ProposalPanel({
 
   const generateMutation = trpc.ai.generateProposal.useMutation({
     onSuccess: (data) => {
+      setGeneratedProposalId(data.proposalId);
       setGeneratedContent({
         coverLetter: data.coverLetter,
         proposedRate: data.proposedRate,
@@ -122,9 +125,22 @@ export function ProposalPanel({
     },
   });
 
+  const markSentMutation = trpc.proposal.updateStatus.useMutation({
+    onSuccess: () => {
+      onProposalGenerated(); // refetch job data to update statuses
+      toast.success("Proposal marked as sent!", {
+        description: "Job has advanced to 'Bid Sent' in your pipeline.",
+      });
+    },
+    onError: () => {
+      toast.error("Failed to mark proposal as sent");
+    },
+  });
+
   const handleGenerate = useCallback(() => {
     setGenerationError(null);
     setGeneratedContent(null);
+    setGeneratedProposalId(null);
     generateMutation.mutate({ jobId });
   }, [jobId, generateMutation]);
 
@@ -174,8 +190,11 @@ export function ProposalPanel({
       <div className="space-y-4">
         <GeneratedProposalView
           content={generatedContent}
+          proposalId={generatedProposalId}
           onRegenerate={handleGenerate}
           onAppendRepo={handleAppendRepoToProposal}
+          onMarkSent={(id) => markSentMutation.mutate({ id, status: "SENT" })}
+          isMarkingSent={markSentMutation.isPending}
         />
         {proposals.length > 0 && (
           <>
@@ -183,7 +202,7 @@ export function ProposalPanel({
             <p className="text-sm font-medium text-muted-foreground">
               Previous Proposals
             </p>
-            <ProposalsList proposals={proposals} />
+            <ProposalsList proposals={proposals} onStatusChanged={onProposalGenerated} />
           </>
         )}
       </div>
@@ -222,7 +241,7 @@ export function ProposalPanel({
           Generate New
         </Button>
       </div>
-      <ProposalsList proposals={proposals} />
+      <ProposalsList proposals={proposals} onStatusChanged={onProposalGenerated} />
     </div>
   );
 }
@@ -240,16 +259,23 @@ interface GeneratedProposalViewProps {
     questionsForClient: string[];
     relevantRepos: RelevantRepoData[];
   };
+  proposalId: string | null;
   onRegenerate: () => void;
   onAppendRepo: (repo: RelevantRepoData) => void;
+  onMarkSent: (proposalId: string) => void;
+  isMarkingSent: boolean;
 }
 
 function GeneratedProposalView({
   content,
+  proposalId,
   onRegenerate,
   onAppendRepo,
+  onMarkSent,
+  isMarkingSent,
 }: GeneratedProposalViewProps) {
   const [copied, setCopied] = useState(false);
+  const [markedSent, setMarkedSent] = useState(false);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(content.coverLetter);
@@ -257,6 +283,12 @@ function GeneratedProposalView({
     toast.success("Cover letter copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
   }, [content.coverLetter]);
+
+  const handleMarkSent = useCallback(() => {
+    if (!proposalId) return;
+    onMarkSent(proposalId);
+    setMarkedSent(true);
+  }, [proposalId, onMarkSent]);
 
   return (
     <div className="space-y-4">
@@ -267,6 +299,7 @@ function GeneratedProposalView({
             <CardTitle className="flex items-center gap-2 text-sm">
               <Sparkles className="h-4 w-4 text-primary" />
               AI-Generated Cover Letter
+              <Badge variant="secondary" className="text-[10px]">DRAFT</Badge>
             </CardTitle>
             <div className="flex items-center gap-2">
               <Tooltip>
@@ -292,6 +325,41 @@ function GeneratedProposalView({
           <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
             <LinkedText text={content.coverLetter} />
           </div>
+          {/* Mark as Sent CTA */}
+          {proposalId && !markedSent && (
+            <div className="mt-4 flex items-center gap-3 rounded-xl border border-cyan-200 bg-cyan-50/50 px-4 py-3 dark:border-cyan-800/40 dark:bg-cyan-950/20">
+              <Send className="h-4 w-4 shrink-0 text-cyan-600" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-cyan-900 dark:text-cyan-200">
+                  Submitted on Upwork?
+                </p>
+                <p className="text-xs text-cyan-700/80 dark:text-cyan-400/80">
+                  Mark as sent to advance your pipeline and track the journey.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="shrink-0 bg-cyan-600 text-white hover:bg-cyan-700"
+                onClick={handleMarkSent}
+                disabled={isMarkingSent}
+              >
+                {isMarkingSent ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Mark as Sent
+              </Button>
+            </div>
+          )}
+          {markedSent && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/20">
+              <Check className="h-4 w-4 text-emerald-600" />
+              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                Proposal marked as sent — pipeline updated!
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -395,19 +463,43 @@ function GeneratedProposalView({
 // Saved Proposals List — shows full cover letter with expand/collapse
 // ---------------------------------------------------------------------------
 
-function ProposalsList({ proposals }: { proposals: ProposalData[] }) {
+function ProposalsList({
+  proposals,
+  onStatusChanged,
+}: {
+  proposals: ProposalData[];
+  onStatusChanged: () => void;
+}) {
   return (
     <div className="space-y-3">
       {proposals.map((p) => (
-        <SavedProposalCard key={p.id} proposal={p} />
+        <SavedProposalCard key={p.id} proposal={p} onStatusChanged={onStatusChanged} />
       ))}
     </div>
   );
 }
 
-function SavedProposalCard({ proposal }: { proposal: ProposalData }) {
+function SavedProposalCard({
+  proposal,
+  onStatusChanged,
+}: {
+  proposal: ProposalData;
+  onStatusChanged: () => void;
+}) {
   const [expanded, setExpanded] = useState(proposals_shouldAutoExpand(proposal));
   const [copied, setCopied] = useState(false);
+
+  const markSentMutation = trpc.proposal.updateStatus.useMutation({
+    onSuccess: () => {
+      onStatusChanged();
+      toast.success("Proposal marked as sent!", {
+        description: "Job has advanced to 'Bid Sent' in your pipeline.",
+      });
+    },
+    onError: () => {
+      toast.error("Failed to update proposal status");
+    },
+  });
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(proposal.coverLetter);
@@ -416,13 +508,22 @@ function SavedProposalCard({ proposal }: { proposal: ProposalData }) {
     setTimeout(() => setCopied(false), 2000);
   }, [proposal.coverLetter]);
 
+  const isDraft = proposal.status === "DRAFT";
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-muted-foreground" />
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge
+              variant="secondary"
+              className={`text-[10px] ${
+                proposal.status === "SENT"
+                  ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400"
+                  : ""
+              }`}
+            >
               {proposal.status}
             </Badge>
             {proposal.aiGenerated && (
@@ -451,6 +552,27 @@ function SavedProposalCard({ proposal }: { proposal: ProposalData }) {
                   </span>
                 )}
               </div>
+            )}
+            {isDraft && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-950/30"
+                    onClick={() => markSentMutation.mutate({ id: proposal.id, status: "SENT" })}
+                    disabled={markSentMutation.isPending}
+                  >
+                    {markSentMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    <span className="text-[11px]">Mark Sent</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Mark as submitted on Upwork — advances pipeline</TooltipContent>
+              </Tooltip>
             )}
             <Tooltip>
               <TooltipTrigger asChild>

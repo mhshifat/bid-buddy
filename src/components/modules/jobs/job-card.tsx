@@ -5,6 +5,7 @@
  * animated micro-interactions, and AI insight badges.
  */
 
+import { useCallback } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,8 +108,14 @@ function getScoreBg(score: number): string {
 export function JobCard(props: JobCardProps) {
   const analysis = props.latestAnalysis;
 
+  /** Remember this job so the list can scroll back to it on return */
+  const handleNavigate = useCallback(() => {
+    sessionStorage.setItem("last-visited-job-id", props.id);
+  }, [props.id]);
+
   return (
     <div
+      data-job-id={props.id}
       className={`
         group relative overflow-hidden rounded-2xl border
         bg-card transition-all duration-300
@@ -137,6 +144,7 @@ export function JobCard(props: JobCardProps) {
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/jobs/${props.id}`}
+                onClick={handleNavigate}
                 className="text-sm font-semibold leading-tight hover:text-primary transition-colors"
               >
                 {props.title}
@@ -294,7 +302,7 @@ export function JobCard(props: JobCardProps) {
                 </a>
               </Button>
               <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" asChild>
-                <Link href={`/jobs/${props.id}`}>
+                <Link href={`/jobs/${props.id}`} onClick={handleNavigate}>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>

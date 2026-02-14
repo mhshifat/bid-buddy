@@ -12,7 +12,6 @@ import Link from "next/link";
 import {
   Bell,
   BellRing,
-  Check,
   CheckCheck,
   Trash2,
   Briefcase,
@@ -29,9 +28,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRealtimeEvents } from "@/hooks/use-realtime-events";
 import type { NotificationItem, EventCategory } from "@/server/events/types";
@@ -175,30 +172,25 @@ export function NotificationBell() {
             </p>
           </div>
         ) : (
-          <ScrollArea className="max-h-[400px]">
-            <div className="divide-y">
-              {displayNotifications.map((notification) => (
-                <NotificationRow
-                  key={notification.id}
-                  notification={notification}
-                  onRead={() => markRead(notification.id)}
-                  onClose={() => setIsOpen(false)}
-                />
-              ))}
-            </div>
-          </ScrollArea>
+          <div className="max-h-[400px] overflow-y-auto overscroll-contain">
+            {displayNotifications.map((notification) => (
+              <NotificationRow
+                key={notification.id}
+                notification={notification}
+                onRead={() => markRead(notification.id)}
+                onClose={() => setIsOpen(false)}
+              />
+            ))}
+          </div>
         )}
 
         {/* Footer */}
         {displayNotifications.length > 0 && (
-          <>
-            <Separator />
-            <div className="p-2 text-center">
-              <span className="text-xs text-muted-foreground">
-                {displayNotifications.length} notification{displayNotifications.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-          </>
+          <div className="border-t p-2 text-center">
+            <span className="text-xs text-muted-foreground">
+              {displayNotifications.length} notification{displayNotifications.length !== 1 ? "s" : ""}
+            </span>
+          </div>
         )}
       </PopoverContent>
     </Popover>
@@ -223,8 +215,8 @@ function NotificationRow({
 
   const content = (
     <div
-      className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50 ${
-        !notification.read ? "bg-muted/20" : ""
+      className={`relative flex items-start gap-3 border-b px-4 py-3 transition-colors hover:bg-muted/50 ${
+        !notification.read ? "bg-muted/20" : "bg-popover"
       }`}
       onClick={onRead}
       role="button"
@@ -238,9 +230,9 @@ function NotificationRow({
       >
         <Icon className={`h-4 w-4 ${config.color}`} />
       </div>
-      <div className="flex-1 space-y-0.5">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium leading-tight">{notification.title}</p>
+          <p className="truncate text-sm font-medium leading-tight">{notification.title}</p>
           {!notification.read && (
             <Badge
               variant="secondary"
@@ -248,7 +240,7 @@ function NotificationRow({
             />
           )}
         </div>
-        <p className="text-xs text-muted-foreground leading-snug">
+        <p className="text-xs text-muted-foreground leading-snug line-clamp-2">
           {notification.description}
         </p>
         <p className="text-[10px] text-muted-foreground/60">
