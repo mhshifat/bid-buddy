@@ -9,7 +9,7 @@
 // Event Categories
 // ============================================================================
 
-export type EventCategory = "job" | "ai" | "proposal" | "project" | "system";
+export type EventCategory = "job" | "ai" | "proposal" | "project" | "system" | "alert";
 
 // ============================================================================
 // Event Payloads
@@ -80,6 +80,14 @@ export interface SystemHeartbeatPayload {
   timestamp: string;
 }
 
+export interface JobMatchAlertPayload {
+  jobId: string;
+  title: string;
+  body: string;
+  matchPercentage: number;
+  jobUrl: string;
+}
+
 // ============================================================================
 // Event Map — maps event names to their payload types
 // ============================================================================
@@ -94,6 +102,7 @@ export interface EventMap {
   "proposal:statusChanged": ProposalStatusChangedPayload;
   "system:connected": SystemConnectedPayload;
   "system:heartbeat": SystemHeartbeatPayload;
+  "alert:jobMatch": JobMatchAlertPayload;
 }
 
 export type EventName = keyof EventMap;
@@ -222,6 +231,16 @@ export function eventToNotification(evt: RealtimeEvent): NotificationItem {
         title: "Heartbeat",
         description: "Connection alive.",
         category: "system",
+      };
+    }
+    case "alert:jobMatch": {
+      const d = evt.data as JobMatchAlertPayload;
+      return {
+        ...base,
+        title: d.title,
+        description: d.body,
+        category: "alert",
+        href: d.jobUrl || `/jobs/${d.jobId}`,
       };
     }
     default:

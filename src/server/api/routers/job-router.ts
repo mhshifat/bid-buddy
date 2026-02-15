@@ -517,6 +517,28 @@ export const jobRouter = createRouter({
     }),
 
   /**
+   * Check which Upwork job IDs already exist in the database.
+   * Used by the browser extension auto-scan to deduplicate before sending.
+   */
+  checkExisting: publicProcedure
+    .input(z.object({ upworkJobIds: z.array(z.string()).max(100) }))
+    .query(async ({ ctx, input }) => {
+      if (input.upworkJobIds.length === 0) return [];
+
+      const tenantId = await resolveTenantId(ctx);
+
+      const existing = await ctx.prisma.job.findMany({
+        where: {
+          tenant_id: tenantId,
+          upwork_job_id: { in: input.upworkJobIds },
+        },
+        select: { upwork_job_id: true },
+      });
+
+      return existing.map((j) => j.upwork_job_id);
+    }),
+
+  /**
    * Get job stats for the dashboard.
    */
   stats: publicProcedure.query(async ({ ctx }) => {

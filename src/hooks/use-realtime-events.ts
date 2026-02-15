@@ -150,6 +150,7 @@ function connect(tenantId?: string): void {
     "proposal:statusChanged",
     "system:connected",
     "system:heartbeat",
+    "alert:jobMatch",
   ];
 
   for (const eventName of eventNames) {

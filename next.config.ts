@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Tell Next.js NOT to bundle these server-only packages with webpack.
+  // They are loaded lazily at runtime via dynamic import() with try/catch,
+  // so they gracefully degrade when not installed.
+  serverExternalPackages: ["web-push", "twilio"],
+
   // Enable CORS for browser extension communication
   async headers() {
     return [

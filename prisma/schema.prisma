@@ -35,6 +35,8 @@ model Tenant {
   project_scopes   ProjectScope[]
   scope_change_requests ScopeChangeRequest[]
   job_activities   JobActivity[]
+  alert_preferences AlertPreference[]
+  notification_logs NotificationLog[]
 
   @@map("tenants")
 }
@@ -63,12 +65,13 @@ model User {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  sessions       Session[]
-  oauth_accounts OAuthAccount[]
-  proposals      Proposal[]
-  projects       ProjectMember[]
-  activity       ActivityLog[]
+  tenant           Tenant            @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  sessions         Session[]
+  oauth_accounts   OAuthAccount[]
+  proposals        Proposal[]
+  projects         ProjectMember[]
+  activity         ActivityLog[]
+  alert_preference AlertPreference?
 
   @@unique([tenant_id, email])
   @@index([tenant_id])
@@ -810,4 +813,85 @@ model JobActivity {
   @@index([tenant_id, phase])
   @@index([created_at])
   @@map("job_activities")
+}
+
+// ============================================================================
+// Job Alert & Notification Settings
+// ============================================================================
+
+enum NotificationChannel {
+  DESKTOP
+  SMS
+  WHATSAPP
+  IN_APP
+}
+
+model AlertPreference {
+  id                   String                @id @default(cuid())
+  tenant_id            String
+  user_id              String                @unique
+  is_enabled           Boolean               @default(true)
+
+  // Auto-scan settings
+  auto_scan_enabled    Boolean               @default(false)
+  scan_interval_minutes Int                  @default(10)
+
+  // Match threshold (e.g. 80 means "notify for ≥80% match")
+  min_match_percentage Int                   @default(80)
+
+  // Categories to watch (Upwork job categories)
+  categories           String[]
+
+  // Skills to match against
+  target_skills        String[]
+
+  // Notification channels enabled
+  channels             NotificationChannel[]
+
+  // Desktop push notification config
+  desktop_enabled      Boolean               @default(false)
+  push_subscription    Json?                 // Web Push subscription object
+
+  // SMS notification config
+  sms_enabled          Boolean               @default(false)
+  sms_phone_number     String?
+  sms_country_code     String?
+  sms_verified         Boolean               @default(false)
+
+  // WhatsApp notification config
+  whatsapp_enabled     Boolean               @default(false)
+  whatsapp_phone_number String?
+  whatsapp_country_code String?
+  whatsapp_verified    Boolean               @default(false)
+
+  created_at           DateTime              @default(now())
+  updated_at           DateTime              @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@map("alert_preferences")
+}
+
+model NotificationLog {
+  id                String              @id @default(cuid())
+  tenant_id         String
+  job_id            String?
+  channel           NotificationChannel
+  title             String
+  body              String
+  match_percentage  Int?
+  status            String              @default("pending") // pending, sent, failed
+  error_message     String?
+  correlation_id    String?
+  sent_at           DateTime?
+  created_at        DateTime            @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([job_id])
+  @@index([created_at])
+  @@map("notification_logs")
 }
