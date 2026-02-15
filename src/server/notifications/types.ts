@@ -68,11 +68,13 @@ export interface AlertPreferenceEntity {
   smsCountryCode: string | null;
   smsVerified: boolean;
 
-  // WhatsApp
+  // WhatsApp (Meta Cloud API)
   whatsappEnabled: boolean;
   whatsappPhoneNumber: string | null;
   whatsappCountryCode: string | null;
   whatsappVerified: boolean;
+  whatsappAccessToken: string | null;
+  whatsappPhoneNumberId: string | null;
 }
 
 // ============================================================================

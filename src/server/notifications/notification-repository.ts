@@ -184,6 +184,8 @@ export class NotificationRepository {
       whatsappPhoneNumber: pref.whatsapp_phone_number,
       whatsappCountryCode: pref.whatsapp_country_code,
       whatsappVerified: pref.whatsapp_verified,
+      whatsappAccessToken: pref.whatsapp_access_token,
+      whatsappPhoneNumberId: pref.whatsapp_phone_number_id,
     };
   }
 
@@ -207,6 +209,8 @@ export class NotificationRepository {
     if (data.whatsappPhoneNumber !== undefined) dbData.whatsapp_phone_number = data.whatsappPhoneNumber;
     if (data.whatsappCountryCode !== undefined) dbData.whatsapp_country_code = data.whatsappCountryCode;
     if (data.whatsappVerified !== undefined) dbData.whatsapp_verified = data.whatsappVerified;
+    if (data.whatsappAccessToken !== undefined) dbData.whatsapp_access_token = data.whatsappAccessToken;
+    if (data.whatsappPhoneNumberId !== undefined) dbData.whatsapp_phone_number_id = data.whatsappPhoneNumberId;
 
     return dbData;
   }

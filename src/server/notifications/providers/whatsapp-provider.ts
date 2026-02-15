@@ -1,14 +1,25 @@
 /**
- * WhatsApp Notification Provider (Twilio WhatsApp Business API).
+ * WhatsApp Notification Provider — Meta WhatsApp Cloud API.
  *
- * Uses the same Twilio SDK as SMS but routes through the WhatsApp channel.
- * Twilio provides a WhatsApp sandbox for testing — production requires
- * an approved WhatsApp Business Profile.
+ * Uses Meta's free Cloud API instead of Twilio. Each user can connect their
+ * own WhatsApp Business number by providing:
  *
- * Environment variables required:
- *   TWILIO_ACCOUNT_SID       — Twilio account SID
- *   TWILIO_AUTH_TOKEN         — Twilio auth token
- *   TWILIO_WHATSAPP_NUMBER   — Twilio WhatsApp sender (e.g. "whatsapp:+14155238886")
+ *   1. A Meta App access token  (stored per-user in alert_preferences)
+ *   2. A phone number ID        (stored per-user in alert_preferences)
+ *
+ * Setup guide for the user:
+ *   1. Go to https://developers.facebook.com → Create App → "Business" type
+ *   2. Add the "WhatsApp" product
+ *   3. In WhatsApp > API Setup, copy:
+ *      - Phone number ID
+ *      - Temporary / permanent access token
+ *   4. Add the recipient number (their own phone) to the test numbers list
+ *   5. Paste the token + phone number ID into Bid Buddy Settings
+ *
+ * API endpoint:
+ *   POST https://graph.facebook.com/v21.0/{phone_number_id}/messages
+ *
+ * Free tier: 1,000 service-initiated conversations per month.
  */
 
 import { logger } from "@/server/lib/logger";
@@ -18,67 +29,48 @@ import type {
   NotificationResult,
 } from "../types";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-// Lazy-load twilio
-async function getTwilioClient(): Promise<any> {
-  try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-    if (!accountSid || !authToken) {
-      return null;
-    }
-
-    const twilio = await import("twilio" as any);
-    const createClient = twilio.default ?? twilio;
-    return createClient(accountSid, authToken);
-  } catch {
-    logger.warn("twilio package not installed. WhatsApp notifications disabled.");
-    return null;
-  }
-}
-
-/* eslint-enable @typescript-eslint/no-explicit-any */
+// Meta Graph API version
+const GRAPH_API_VERSION = "v21.0";
+const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 export class WhatsAppNotificationProvider implements NotificationProvider {
   readonly channel = "WHATSAPP" as const;
-  readonly name = "twilio-whatsapp";
+  readonly name = "meta-whatsapp-cloud";
 
   async send(
     payload: NotificationPayload,
     config: Record<string, unknown>,
   ): Promise<NotificationResult> {
     try {
-      const client = await getTwilioClient();
-      if (!client) {
+      const accessToken = config.whatsappAccessToken as string | undefined;
+      const phoneNumberId = config.whatsappPhoneNumberId as string | undefined;
+      const recipientNumber = config.phoneNumber as string | undefined;
+
+      // Validate required config
+      if (!accessToken || !phoneNumberId) {
         return {
           success: false,
           channel: this.channel,
-          error: "WhatsApp not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN in environment.",
+          error:
+            "WhatsApp not configured. Enter your Meta Cloud API access token and Phone Number ID in Settings.",
         };
       }
 
-      const fromNumber =
-        process.env.TWILIO_WHATSAPP_NUMBER ?? "whatsapp:+14155238886"; // sandbox default
-      const toNumber = config.phoneNumber as string | undefined;
-      if (!toNumber) {
+      if (!recipientNumber) {
         return {
           success: false,
           channel: this.channel,
-          error: "No phone number configured for WhatsApp notifications.",
+          error: "No recipient phone number configured for WhatsApp notifications.",
         };
       }
 
-      // Ensure whatsapp: prefix
-      const formattedTo = toNumber.startsWith("whatsapp:")
-        ? toNumber
-        : `whatsapp:${toNumber}`;
+      // Normalize the phone number: remove spaces, dashes, and the "+" prefix
+      // Meta expects the number in international format without the "+" (e.g. "14155238886")
+      const normalizedNumber = recipientNumber
+        .replace(/[\s\-()]/g, "")
+        .replace(/^\+/, "");
 
-      const formattedFrom = fromNumber.startsWith("whatsapp:")
-        ? fromNumber
-        : `whatsapp:${fromNumber}`;
-
+      // Build the message body
       const messageBody = [
         `🎯 *${payload.title}*`,
         "",
@@ -86,31 +78,77 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
         "",
         payload.jobUrl ? `🔗 View job: ${payload.jobUrl}` : "",
       ]
-        .filter((line) => line !== undefined)
+        .filter((line) => line !== undefined && line !== "")
         .join("\n");
 
-      const message = await client.messages.create({
-        body: messageBody,
-        from: formattedFrom,
-        to: formattedTo,
+      // Call Meta Cloud API
+      const url = `${GRAPH_API_BASE}/${phoneNumberId}/messages`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: normalizedNumber,
+          type: "text",
+          text: {
+            preview_url: true,
+            body: messageBody,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const metaError =
+          (errorData as Record<string, Record<string, string>>)?.error?.message ||
+          `HTTP ${response.status} ${response.statusText}`;
+        logger.error("Meta WhatsApp Cloud API error", undefined, {
+          status: String(response.status),
+          error: metaError,
+        });
+        return {
+          success: false,
+          channel: this.channel,
+          error: `Meta API error: ${metaError}`,
+        };
+      }
+
+      const data = (await response.json()) as {
+        messages?: Array<{ id: string }>;
+      };
+      const messageId = data?.messages?.[0]?.id;
+
+      logger.info("WhatsApp message sent via Meta Cloud API", {
+        messageId: messageId ?? "unknown",
+        to: normalizedNumber.slice(0, 4) + "****",
       });
 
       return {
         success: true,
         channel: this.channel,
-        messageId: message.sid,
+        messageId: messageId ?? undefined,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      logger.error("WhatsApp notification failed", error instanceof Error ? error : undefined);
+      logger.error(
+        "WhatsApp notification failed",
+        error instanceof Error ? error : undefined,
+      );
       return { success: false, channel: this.channel, error: errorMsg };
     }
   }
 
+  /**
+   * Health check — we can't check per-user tokens at the provider level,
+   * so we just report healthy. The actual send() will return meaningful errors.
+   */
   async healthCheck(): Promise<boolean> {
-    return (
-      !!process.env.TWILIO_ACCOUNT_SID &&
-      !!process.env.TWILIO_AUTH_TOKEN
-    );
+    // Meta Cloud API doesn't require global env vars — tokens are per-user.
+    // Always report healthy since validation happens at send() time.
+    return true;
   }
 }

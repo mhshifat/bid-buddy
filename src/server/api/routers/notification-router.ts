@@ -80,6 +80,8 @@ const updatePreferencesSchema = z.object({
   whatsappEnabled: z.boolean().optional(),
   whatsappPhoneNumber: z.string().nullable().optional(),
   whatsappCountryCode: z.string().nullable().optional(),
+  whatsappAccessToken: z.string().nullable().optional(),
+  whatsappPhoneNumberId: z.string().nullable().optional(),
 });
 
 // ============================================================================
@@ -233,6 +235,12 @@ export const notificationRouter = createRouter({
       if (!pref.desktopEnabled && !pref.smsEnabled && !pref.whatsappEnabled) {
         issues.push("No external notification channels enabled. Only in-app (bell icon) notifications will work.");
       }
+      if (pref.whatsappEnabled && (!pref.whatsappAccessToken || !pref.whatsappPhoneNumberId)) {
+        issues.push("WhatsApp is enabled but Meta Cloud API credentials are missing. Enter your Phone Number ID and Access Token in Settings.");
+      }
+      if (pref.whatsappEnabled && !pref.whatsappPhoneNumber) {
+        issues.push("WhatsApp is enabled but no recipient phone number is set.");
+      }
     }
 
     if (!desktopHealth) {
@@ -249,6 +257,7 @@ export const notificationRouter = createRouter({
             hasPushSubscription: !!pref.pushSubscription,
             smsEnabled: pref.smsEnabled,
             whatsappEnabled: pref.whatsappEnabled,
+            hasWhatsappCredentials: !!(pref.whatsappAccessToken && pref.whatsappPhoneNumberId),
             categories: pref.categories,
             targetSkills: pref.targetSkills,
           }

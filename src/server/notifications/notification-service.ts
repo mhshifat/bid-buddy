@@ -294,6 +294,8 @@ export class NotificationService {
           phoneNumber: pref.whatsappCountryCode && pref.whatsappPhoneNumber
             ? `${pref.whatsappCountryCode}${pref.whatsappPhoneNumber}`
             : pref.whatsappPhoneNumber,
+          whatsappAccessToken: pref.whatsappAccessToken,
+          whatsappPhoneNumberId: pref.whatsappPhoneNumberId,
         };
       case "IN_APP":
       default:

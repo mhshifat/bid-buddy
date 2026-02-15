@@ -858,11 +858,13 @@ model AlertPreference {
   sms_country_code     String?
   sms_verified         Boolean               @default(false)
 
-  // WhatsApp notification config
-  whatsapp_enabled     Boolean               @default(false)
-  whatsapp_phone_number String?
-  whatsapp_country_code String?
-  whatsapp_verified    Boolean               @default(false)
+  // WhatsApp notification config (Meta Cloud API — per-user credentials)
+  whatsapp_enabled         Boolean               @default(false)
+  whatsapp_phone_number    String?               // Recipient's WhatsApp number
+  whatsapp_country_code    String?
+  whatsapp_verified        Boolean               @default(false)
+  whatsapp_access_token    String?               // Meta Cloud API access token
+  whatsapp_phone_number_id String?               // Meta Cloud API phone number ID
 
   created_at           DateTime              @default(now())
   updated_at           DateTime              @updatedAt

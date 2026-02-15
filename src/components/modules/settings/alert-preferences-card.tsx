@@ -152,10 +152,13 @@ export function AlertPreferencesCard() {
   const [smsCountryCode, setSmsCountryCode] = useState("+1");
   const [smsPhoneNumber, setSmsPhoneNumber] = useState("");
 
-  // WhatsApp
+  // WhatsApp (Meta Cloud API)
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const [whatsappCountryCode, setWhatsappCountryCode] = useState("+1");
   const [whatsappPhoneNumber, setWhatsappPhoneNumber] = useState("");
+  const [whatsappAccessToken, setWhatsappAccessToken] = useState("");
+  const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState("");
+  const [showWhatsappSetup, setShowWhatsappSetup] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Sync from server → local state
@@ -177,6 +180,8 @@ export function AlertPreferencesCard() {
     setWhatsappEnabled(preferences.whatsappEnabled);
     setWhatsappCountryCode(preferences.whatsappCountryCode ?? "+1");
     setWhatsappPhoneNumber(preferences.whatsappPhoneNumber ?? "");
+    setWhatsappAccessToken(preferences.whatsappAccessToken ?? "");
+    setWhatsappPhoneNumberId(preferences.whatsappPhoneNumberId ?? "");
   }, [preferences]);
 
   // ---------------------------------------------------------------------------
@@ -288,6 +293,8 @@ export function AlertPreferencesCard() {
       whatsappEnabled,
       whatsappPhoneNumber: whatsappPhoneNumber || null,
       whatsappCountryCode: whatsappCountryCode || null,
+      whatsappAccessToken: whatsappAccessToken || null,
+      whatsappPhoneNumberId: whatsappPhoneNumberId || null,
     });
   }, [
     isEnabled,
@@ -303,6 +310,8 @@ export function AlertPreferencesCard() {
     whatsappEnabled,
     whatsappPhoneNumber,
     whatsappCountryCode,
+    whatsappAccessToken,
+    whatsappPhoneNumberId,
     updateMutation,
   ]);
 
@@ -721,7 +730,7 @@ export function AlertPreferencesCard() {
               )}
             </div>
 
-            {/* ---- WhatsApp Notifications ---- */}
+            {/* ---- WhatsApp Notifications (Meta Cloud API) ---- */}
             <div className="rounded-lg border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -731,7 +740,7 @@ export function AlertPreferencesCard() {
                       WhatsApp Notifications
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Receive WhatsApp messages for job matches
+                      Receive WhatsApp messages via Meta Cloud API (free)
                     </p>
                   </div>
                 </div>
@@ -743,6 +752,93 @@ export function AlertPreferencesCard() {
 
               {whatsappEnabled && (
                 <div className="ml-6 space-y-3">
+                  {/* Connection status */}
+                  <div className="flex items-center gap-2">
+                    {whatsappAccessToken && whatsappPhoneNumberId ? (
+                      <>
+                        <CheckCircle className="h-3 w-3 text-emerald-500" />
+                        <span className="text-xs text-emerald-600">
+                          Meta WhatsApp connected
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-[10px] ml-auto"
+                          onClick={() => setShowWhatsappSetup(!showWhatsappSetup)}
+                        >
+                          {showWhatsappSetup ? "Hide" : "Edit"} Credentials
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-3 w-3 text-amber-500" />
+                        <span className="text-xs text-amber-600">
+                          Not connected — set up your Meta WhatsApp credentials
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Setup guide */}
+                  {(!whatsappAccessToken || !whatsappPhoneNumberId || showWhatsappSetup) && (
+                    <div className="rounded-md bg-emerald-50 dark:bg-emerald-900/20 p-3 space-y-2">
+                      <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                        📱 How to connect your WhatsApp (free):
+                      </p>
+                      <ol className="text-[11px] text-emerald-600 dark:text-emerald-400 space-y-1 list-decimal list-inside">
+                        <li>
+                          Go to{" "}
+                          <a
+                            href="https://developers.facebook.com/apps/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline font-medium"
+                          >
+                            Meta Developer Dashboard
+                          </a>
+                          {" → Create App → Select \u201CBusiness\u201D type"}
+                        </li>
+                        <li>{"Add the \"WhatsApp\" product to your app"}</li>
+                        <li>{"Go to WhatsApp → API Setup"}</li>
+                        <li>{"Copy your Phone Number ID and Access Token"}</li>
+                        <li>{"Add your personal number as a test recipient"}</li>
+                        <li>{"Paste the credentials below and save"}</li>
+                        <li>{"Make sure to click Send Message to test your setup from API Setup page"}</li>
+                        <li>{"Then reply to that message from your WhatsApp"}</li>
+                        <li>{"No click on test from the setting page from our app which will send a test message from our app and if you see it, your setup is complete"}</li>
+                      </ol>
+                      <p className="text-[10px] text-muted-foreground">
+                        Free tier: 1,000 conversations/month. No credit card needed.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Credentials form */}
+                  {(!whatsappAccessToken || !whatsappPhoneNumberId || showWhatsappSetup) && (
+                    <div className="space-y-2">
+                      <div>
+                        <Label className="text-xs">Phone Number ID</Label>
+                        <Input
+                          value={whatsappPhoneNumberId}
+                          onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
+                          placeholder="e.g. 123456789012345"
+                          className="mt-1 font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Access Token</Label>
+                        <Input
+                          type="password"
+                          value={whatsappAccessToken}
+                          onChange={(e) => setWhatsappAccessToken(e.target.value)}
+                          placeholder="Paste your Meta access token..."
+                          className="mt-1 font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recipient number */}
                   <div className="flex gap-2">
                     <div className="w-24">
                       <Label className="text-xs">Country Code</Label>
@@ -756,7 +852,7 @@ export function AlertPreferencesCard() {
                       />
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs">WhatsApp Number</Label>
+                      <Label className="text-xs">Your WhatsApp Number</Label>
                       <Input
                         value={whatsappPhoneNumber}
                         onChange={(e) =>
@@ -768,12 +864,12 @@ export function AlertPreferencesCard() {
                     </div>
                   </div>
 
-                  {whatsappPhoneNumber && (
+                  {/* Test button */}
+                  {whatsappPhoneNumber && whatsappAccessToken && whatsappPhoneNumberId && (
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-3 w-3 text-amber-500" />
+                      <CheckCircle className="h-3 w-3 text-emerald-500" />
                       <span className="text-[10px] text-muted-foreground">
-                        Requires Twilio WhatsApp setup
-                        (TWILIO_WHATSAPP_NUMBER env var)
+                        Ready to send — save first, then test
                       </span>
                       <Button
                         variant="ghost"
@@ -785,6 +881,16 @@ export function AlertPreferencesCard() {
                         <TestTube className="h-3 w-3 mr-1" />
                         Test
                       </Button>
+                    </div>
+                  )}
+
+                  {/* Missing config warning */}
+                  {whatsappPhoneNumber && (!whatsappAccessToken || !whatsappPhoneNumberId) && (
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-3 w-3 text-amber-500" />
+                      <span className="text-[10px] text-amber-600">
+                        Enter your Meta Phone Number ID and Access Token above to enable WhatsApp
+                      </span>
                     </div>
                   )}
                 </div>
@@ -896,6 +1002,13 @@ function NotificationDiagnostics() {
                   </span>
                   <span className="text-muted-foreground">Desktop provider:</span>
                   <span>{diag.desktopProviderHealthy ? "✅ Healthy" : "❌ Unhealthy"}</span>
+                  <span className="text-muted-foreground">WhatsApp:</span>
+                  <span>
+                    {diag.preferences.whatsappEnabled ? "✅ Enabled" : "❌ Off"}
+                    {diag.preferences.whatsappEnabled && (
+                      <> · Creds: {diag.preferences.hasWhatsappCredentials ? "✅" : "❌ Missing"}</>
+                    )}
+                  </span>
                   <span className="text-muted-foreground">Min match %:</span>
                   <span>{diag.preferences.minMatchPercentage}%</span>
                 </div>
