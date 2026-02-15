@@ -290,7 +290,7 @@ export class NotificationService {
   ): Record<string, unknown> {
     switch (channel) {
       case "DESKTOP":
-        return { pushSubscription: pref.pushSubscription };
+        return { pushSubscription: pref.pushSubscription ? JSON.stringify(pref.pushSubscription) : null };
       case "SMS":
         return {
           phoneNumber: pref.smsCountryCode && pref.smsPhoneNumber

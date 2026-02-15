@@ -77,13 +77,34 @@ export class DesktopNotificationProvider implements NotificationProvider {
         };
       }
 
-      const subscription = config.pushSubscription as Record<string, unknown> | undefined;
-      if (!subscription || !subscription.endpoint) {
+      const subscriptionString = config.pushSubscription as string | undefined;
+      if (!subscriptionString) {
         return {
           success: false,
           channel: this.channel,
           error:
             "No push subscription registered for this user. " +
+            "Please toggle Desktop Notifications off and on to re-register.",
+        };
+      }
+
+      let subscription: Record<string, unknown>;
+      try {
+        subscription = JSON.parse(subscriptionString);
+      } catch (error) {
+        return {
+          success: false,
+          channel: this.channel,
+          error: "Invalid push subscription format.",
+        };
+      }
+
+      if (!subscription.endpoint) {
+        return {
+          success: false,
+          channel: this.channel,
+          error:
+            "Invalid push subscription: missing endpoint. " +
             "Please toggle Desktop Notifications off and on to re-register.",
         };
       }

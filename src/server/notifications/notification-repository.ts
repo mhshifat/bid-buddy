@@ -196,7 +196,7 @@ export class NotificationRepository {
       targetSkills: pref.target_skills ?? [],
       channels: pref.channels ?? [],
       desktopEnabled: pref.desktop_enabled,
-      pushSubscription: pref.push_subscription as Record<string, unknown> | null,
+      pushSubscription: await this.getPushSubscription(pref.push_subscription),
       smsEnabled: pref.sms_enabled,
       smsPhoneNumber: pref.sms_phone_number,
       smsCountryCode: pref.sms_country_code,
@@ -221,7 +221,7 @@ export class NotificationRepository {
     if (data.targetSkills !== undefined) dbData.target_skills = data.targetSkills;
     if (data.channels !== undefined) dbData.channels = data.channels;
     if (data.desktopEnabled !== undefined) dbData.desktop_enabled = data.desktopEnabled;
-    if (data.pushSubscription !== undefined) dbData.push_subscription = data.pushSubscription;
+    if (data.pushSubscription !== undefined) dbData.push_subscription = data.pushSubscription ? await this.encryptPushSubscription(JSON.stringify(data.pushSubscription)) : null;
     if (data.smsEnabled !== undefined) dbData.sms_enabled = data.smsEnabled;
     if (data.smsPhoneNumber !== undefined) dbData.sms_phone_number = data.smsPhoneNumber;
     if (data.smsCountryCode !== undefined) dbData.sms_country_code = data.smsCountryCode;
@@ -234,6 +234,77 @@ export class NotificationRepository {
     if (data.whatsappPhoneNumberId !== undefined) dbData.whatsapp_phone_number_id = await this.encryptWhatsAppToken(data.whatsappPhoneNumberId);
 
     return dbData;
+  }
+
+  /**
+   * Get push subscription, handling both encrypted strings and existing JSON objects.
+   */
+  private async getPushSubscription(pushSubscriptionData: any): Promise<Record<string, unknown> | null> {
+    if (!pushSubscriptionData) return null;
+
+    // If it's already an object (existing unencrypted data), return it directly
+    if (typeof pushSubscriptionData === 'object' && !Array.isArray(pushSubscriptionData)) {
+      return pushSubscriptionData as Record<string, unknown>;
+    }
+
+    // If it's a string, it might be encrypted or plain JSON
+    if (typeof pushSubscriptionData === 'string') {
+      try {
+        // Try to decrypt it first
+        const decrypted = await this.decryptPushSubscription(pushSubscriptionData);
+        if (decrypted) {
+          // Parse the decrypted JSON string
+          return JSON.parse(decrypted);
+        }
+      } catch (error) {
+        // If decryption fails, try to parse it as plain JSON
+        try {
+          return JSON.parse(pushSubscriptionData);
+        } catch (parseError) {
+          logger.warn("Failed to parse push subscription as JSON", { error: parseError });
+          return null;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Decrypt a push subscription for use.
+   */
+  private async decryptPushSubscription(encryptedSubscription: string | null): Promise<string | null> {
+    if (!encryptedSubscription) return null;
+    try {
+      // Check if it looks like encrypted data
+      if (!isEncrypted(encryptedSubscription)) {
+        // If not encrypted, treat as plain text (backward compatibility)
+        logger.warn("Found unencrypted push subscription, treating as plain text");
+        return encryptedSubscription;
+      }
+      // Try to decrypt
+      const decrypted = await decrypt(encryptedSubscription);
+      return decrypted;
+    } catch (error) {
+      // If decryption fails, it might be plain text that looks encrypted
+      logger.warn("Failed to decrypt push subscription, treating as plain text for backward compatibility", {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return encryptedSubscription;
+    }
+  }
+
+  /**
+   * Encrypt a push subscription for secure storage.
+   */
+  private async encryptPushSubscription(subscription: string | null): Promise<string | null> {
+    if (!subscription) return null;
+    try {
+      return await encrypt(subscription);
+    } catch (error) {
+      logger.error("Failed to encrypt push subscription", error instanceof Error ? error : undefined);
+      throw new Error("Failed to encrypt push subscription");
+    }
   }
 
   /**
