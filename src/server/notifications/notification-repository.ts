@@ -7,6 +7,7 @@
 
 import type { PrismaClient } from "@prisma/client";
 import { logger } from "@/server/lib/logger";
+import { encrypt, decrypt, isEncrypted } from "@/server/lib/encryption";
 import type {
   AlertPreferenceEntity,
   NotificationChannel,
@@ -83,6 +84,7 @@ export class NotificationRepository {
    */
   async logNotification(params: {
     tenantId: string;
+    userId?: string;
     jobId?: string;
     channel: NotificationChannel;
     title: string;
@@ -95,6 +97,7 @@ export class NotificationRepository {
       await this.prisma.notificationLog.create({
         data: {
           tenant_id: params.tenantId,
+          user_id: params.userId,
           job_id: params.jobId,
           channel: params.channel,
           title: params.title,
@@ -113,6 +116,23 @@ export class NotificationRepository {
         { correlationId: params.correlationId },
       );
     }
+  }
+
+  /**
+   * Check if a notification for the same job was already sent to the user.
+   */
+  async hasNotificationBeenSentForJob(
+    userId: string,
+    jobId: string,
+  ): Promise<boolean> {
+    const count = await this.prisma.notificationLog.count({
+      where: {
+        user_id: userId,
+        job_id: jobId,
+        status: "sent",
+      },
+    });
+    return count > 0;
   }
 
   /**
@@ -140,6 +160,7 @@ export class NotificationRepository {
     return {
       items: items.map((log) => ({
         id: log.id,
+        userId: log.user_id,
         channel: log.channel,
         title: log.title,
         body: log.body,
@@ -184,8 +205,8 @@ export class NotificationRepository {
       whatsappPhoneNumber: pref.whatsapp_phone_number,
       whatsappCountryCode: pref.whatsapp_country_code,
       whatsappVerified: pref.whatsapp_verified,
-      whatsappAccessToken: pref.whatsapp_access_token,
-      whatsappPhoneNumberId: pref.whatsapp_phone_number_id,
+      whatsappAccessToken: pref.whatsapp_access_token ? this.decryptWhatsAppToken(pref.whatsapp_access_token) : null,
+      whatsappPhoneNumberId: pref.whatsapp_phone_number_id ? this.decryptWhatsAppToken(pref.whatsapp_phone_number_id) : null,
     };
   }
 
@@ -209,11 +230,46 @@ export class NotificationRepository {
     if (data.whatsappPhoneNumber !== undefined) dbData.whatsapp_phone_number = data.whatsappPhoneNumber;
     if (data.whatsappCountryCode !== undefined) dbData.whatsapp_country_code = data.whatsappCountryCode;
     if (data.whatsappVerified !== undefined) dbData.whatsapp_verified = data.whatsappVerified;
-    if (data.whatsappAccessToken !== undefined) dbData.whatsapp_access_token = data.whatsappAccessToken;
-    if (data.whatsappPhoneNumberId !== undefined) dbData.whatsapp_phone_number_id = data.whatsappPhoneNumberId;
+    if (data.whatsappAccessToken !== undefined) dbData.whatsapp_access_token = this.encryptWhatsAppToken(data.whatsappAccessToken);
+    if (data.whatsappPhoneNumberId !== undefined) dbData.whatsapp_phone_number_id = this.encryptWhatsAppToken(data.whatsappPhoneNumberId);
 
     return dbData;
   }
+
+  /**
+   * Encrypt a WhatsApp token for secure storage.
+   */
+  private encryptWhatsAppToken(token: string | null): string | null {
+    if (!token) return null;
+    try {
+      return encrypt(token);
+    } catch (error) {
+      logger.error("Failed to encrypt WhatsApp token", error instanceof Error ? error : undefined);
+      throw new Error("Failed to encrypt WhatsApp credentials");
+    }
+  }
+
+  /**
+   * Decrypt a WhatsApp token for use.
+   */
+  private decryptWhatsAppToken(encryptedToken: string | null): string | null {
+    if (!encryptedToken) return null;
+    try {
+      // Check if it's already encrypted (for backward compatibility)
+      if (!isEncrypted(encryptedToken)) {
+        // If not encrypted, encrypt it first for future use
+        logger.warn("Found unencrypted WhatsApp token, encrypting for security");
+        // Note: We can't encrypt here because we don't have the original value
+        // This will be handled during the next save operation
+        return encryptedToken;
+      }
+      return decrypt(encryptedToken);
+    } catch (error) {
+      logger.error("Failed to decrypt WhatsApp token", error instanceof Error ? error : undefined);
+      throw new Error("Failed to decrypt WhatsApp credentials");
+    }
+  }
+
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 

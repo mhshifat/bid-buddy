@@ -1,5 +1,20 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Security
+
+### Data Encryption
+
+Sensitive user data such as WhatsApp API credentials are encrypted at rest using AES-256-GCM encryption.
+
+**Environment Variables Required:**
+- `ENCRYPTION_KEY`: A secure encryption key for sensitive data. Must be set in production.
+
+**Encrypted Fields:**
+- WhatsApp access tokens
+- WhatsApp phone number IDs
+
+The encryption key is derived using scrypt and should be a strong, randomly generated string. Never commit it to version control.
+
 ## Getting Started
 
 First, run the development server:

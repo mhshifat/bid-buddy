@@ -154,6 +154,13 @@ export class NotificationService {
       { correlationId },
     );
 
+    // Check if already notified for this job
+    const alreadyNotified = await this.repository.hasNotificationBeenSentForJob(pref.userId, alert.jobId);
+    if (alreadyNotified) {
+      logger.info(`[NOTIFY] SKIP user ${pref.userId}: already notified for job ${alert.jobId}`, { correlationId });
+      return;
+    }
+
     // Build notification payload
     const payload: NotificationPayload = {
       tenantId: pref.tenantId,
@@ -228,6 +235,7 @@ export class NotificationService {
       // Log the notification attempt
       await this.repository.logNotification({
         tenantId: payload.tenantId,
+        userId: payload.userId,
         jobId: payload.jobId,
         channel,
         title: payload.title,
@@ -358,6 +366,7 @@ export class NotificationService {
       // Log the test attempt
       await this.repository.logNotification({
         tenantId,
+        userId,
         jobId: "test",
         channel,
         title: payload.title,

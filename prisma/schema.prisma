@@ -879,6 +879,7 @@ model AlertPreference {
 model NotificationLog {
   id                String              @id @default(cuid())
   tenant_id         String
+  user_id           String?
   job_id            String?
   channel           NotificationChannel
   title             String
@@ -893,6 +894,7 @@ model NotificationLog {
   tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([tenant_id])
+  @@index([user_id])
   @@index([job_id])
   @@index([created_at])
   @@map("notification_logs")
