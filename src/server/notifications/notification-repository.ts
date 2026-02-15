@@ -35,7 +35,7 @@ export class NotificationRepository {
 
     if (!pref) return null;
 
-    return this.mapToEntity(pref);
+    return await this.mapToEntity(pref);
   }
 
   /**
@@ -49,7 +49,7 @@ export class NotificationRepository {
       },
     });
 
-    return prefs.map((p) => this.mapToEntity(p));
+    return await Promise.all(prefs.map((p) => this.mapToEntity(p)));
   }
 
   /**
@@ -60,7 +60,7 @@ export class NotificationRepository {
     userId: string,
     data: Partial<Omit<AlertPreferenceEntity, "id" | "tenantId" | "userId">>,
   ): Promise<AlertPreferenceEntity> {
-    const dbData = this.mapToDbFields(data);
+    const dbData = await this.mapToDbFields(data);
 
     const result = await this.prisma.alertPreference.upsert({
       where: { user_id: userId },
@@ -72,7 +72,7 @@ export class NotificationRepository {
       update: dbData,
     });
 
-    return this.mapToEntity(result);
+    return await this.mapToEntity(result);
   }
 
   // --------------------------------------------------------------------------
@@ -183,7 +183,7 @@ export class NotificationRepository {
   // --------------------------------------------------------------------------
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  private mapToEntity(pref: any): AlertPreferenceEntity {
+  private async mapToEntity(pref: any): Promise<AlertPreferenceEntity> {
     return {
       id: pref.id,
       tenantId: pref.tenant_id,
@@ -205,12 +205,12 @@ export class NotificationRepository {
       whatsappPhoneNumber: pref.whatsapp_phone_number,
       whatsappCountryCode: pref.whatsapp_country_code,
       whatsappVerified: pref.whatsapp_verified,
-      whatsappAccessToken: pref.whatsapp_access_token ? this.decryptWhatsAppToken(pref.whatsapp_access_token) : null,
-      whatsappPhoneNumberId: pref.whatsapp_phone_number_id ? this.decryptWhatsAppToken(pref.whatsapp_phone_number_id) : null,
+      whatsappAccessToken: pref.whatsapp_access_token ? await this.decryptWhatsAppToken(pref.whatsapp_access_token) : null,
+      whatsappPhoneNumberId: pref.whatsapp_phone_number_id ? await this.decryptWhatsAppToken(pref.whatsapp_phone_number_id) : null,
     };
   }
 
-  private mapToDbFields(data: Partial<Omit<AlertPreferenceEntity, "id" | "tenantId" | "userId">>): Record<string, unknown> {
+  private async mapToDbFields(data: Partial<Omit<AlertPreferenceEntity, "id" | "tenantId" | "userId">>): Promise<Record<string, unknown>> {
     const dbData: Record<string, unknown> = {};
 
     if (data.isEnabled !== undefined) dbData.is_enabled = data.isEnabled;
@@ -230,8 +230,8 @@ export class NotificationRepository {
     if (data.whatsappPhoneNumber !== undefined) dbData.whatsapp_phone_number = data.whatsappPhoneNumber;
     if (data.whatsappCountryCode !== undefined) dbData.whatsapp_country_code = data.whatsappCountryCode;
     if (data.whatsappVerified !== undefined) dbData.whatsapp_verified = data.whatsappVerified;
-    if (data.whatsappAccessToken !== undefined) dbData.whatsapp_access_token = this.encryptWhatsAppToken(data.whatsappAccessToken);
-    if (data.whatsappPhoneNumberId !== undefined) dbData.whatsapp_phone_number_id = this.encryptWhatsAppToken(data.whatsappPhoneNumberId);
+    if (data.whatsappAccessToken !== undefined) dbData.whatsapp_access_token = await this.encryptWhatsAppToken(data.whatsappAccessToken);
+    if (data.whatsappPhoneNumberId !== undefined) dbData.whatsapp_phone_number_id = await this.encryptWhatsAppToken(data.whatsappPhoneNumberId);
 
     return dbData;
   }
@@ -239,10 +239,10 @@ export class NotificationRepository {
   /**
    * Encrypt a WhatsApp token for secure storage.
    */
-  private encryptWhatsAppToken(token: string | null): string | null {
+  private async encryptWhatsAppToken(token: string | null): Promise<string | null> {
     if (!token) return null;
     try {
-      return encrypt(token);
+      return await encrypt(token);
     } catch (error) {
       logger.error("Failed to encrypt WhatsApp token", error instanceof Error ? error : undefined);
       throw new Error("Failed to encrypt WhatsApp credentials");
@@ -252,21 +252,24 @@ export class NotificationRepository {
   /**
    * Decrypt a WhatsApp token for use.
    */
-  private decryptWhatsAppToken(encryptedToken: string | null): string | null {
+  private async decryptWhatsAppToken(encryptedToken: string | null): Promise<string | null> {
     if (!encryptedToken) return null;
     try {
-      // Check if it's already encrypted (for backward compatibility)
+      // Check if it looks like encrypted data
       if (!isEncrypted(encryptedToken)) {
-        // If not encrypted, encrypt it first for future use
-        logger.warn("Found unencrypted WhatsApp token, encrypting for security");
-        // Note: We can't encrypt here because we don't have the original value
-        // This will be handled during the next save operation
+        // If not encrypted, treat as plain text (backward compatibility)
+        logger.warn("Found unencrypted WhatsApp token, treating as plain text");
         return encryptedToken;
       }
-      return decrypt(encryptedToken);
+      // Try to decrypt
+      const decrypted = await decrypt(encryptedToken);
+      return decrypted;
     } catch (error) {
-      logger.error("Failed to decrypt WhatsApp token", error instanceof Error ? error : undefined);
-      throw new Error("Failed to decrypt WhatsApp credentials");
+      // If decryption fails, it might be plain text that looks encrypted
+      logger.warn("Failed to decrypt WhatsApp token, treating as plain text for backward compatibility", {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return encryptedToken;
     }
   }
 

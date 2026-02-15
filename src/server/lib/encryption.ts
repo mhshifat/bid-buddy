@@ -1,11 +1,9 @@
 /**
  * Encryption utilities for sensitive data storage.
  *
- * Uses AES-256-GCM encryption with a derived key from environment variables.
+ * Uses AES-256-CBC encryption with a derived key from environment variables.
  * The encryption key is derived from ENCRYPTION_KEY environment variable.
  */
-
-import { createCipher, createDecipher, randomBytes, scryptSync } from "crypto";
 
 // Environment variable for encryption key
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
@@ -14,18 +12,30 @@ if (!ENCRYPTION_KEY) {
   throw new Error("ENCRYPTION_KEY environment variable is required for data encryption");
 }
 
-// Derive a 32-byte key from the environment variable using scrypt
-const KEY = scryptSync(ENCRYPTION_KEY, "bid-buddy-salt", 32);
 const ALGORITHM = "aes-256-cbc"; // Using CBC for broader compatibility
 const IV_LENGTH = 16; // 128 bits
+
+// Lazy load crypto functions to avoid Turbopack issues
+let cryptoModule: any = null;
+let KEY: Buffer | null = null;
+
+async function getCrypto() {
+  if (!cryptoModule) {
+    cryptoModule = await import("crypto");
+    // Derive the key once
+    KEY = cryptoModule.scryptSync(ENCRYPTION_KEY!, "bid-buddy-salt", 32);
+  }
+  return cryptoModule;
+}
 
 /**
  * Encrypt a string value.
  * Returns a base64-encoded string containing IV + encrypted data.
  */
-export function encrypt(text: string): string {
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipher(ALGORITHM, KEY, iv);
+export async function encrypt(text: string): Promise<string> {
+  const crypto = await getCrypto();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, KEY!, iv);
 
   const encryptedBuffer = Buffer.concat([
     cipher.update(text, "utf8"),
@@ -41,7 +51,8 @@ export function encrypt(text: string): string {
 /**
  * Decrypt a previously encrypted string value.
  */
-export function decrypt(encryptedText: string): string {
+export async function decrypt(encryptedText: string): Promise<string> {
+  const crypto = await getCrypto();
   const combined = Buffer.from(encryptedText, "base64");
 
   if (combined.length < IV_LENGTH) {
@@ -51,7 +62,7 @@ export function decrypt(encryptedText: string): string {
   const iv = combined.subarray(0, IV_LENGTH);
   const encrypted = combined.subarray(IV_LENGTH);
 
-  const decipher = createDecipher(ALGORITHM, KEY, iv);
+  const decipher = crypto.createDecipheriv(ALGORITHM, KEY!, iv);
 
   const decryptedBuffer = Buffer.concat([
     decipher.update(encrypted),
