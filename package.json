@@ -39,10 +39,10 @@
     "twilio": "^5.12.1",
     "uuid": "^13.0.0",
     "web-push": "^3.6.7",
+    "@tailwindcss/postcss": "^4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
