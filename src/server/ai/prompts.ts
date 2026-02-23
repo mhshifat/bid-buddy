@@ -43,6 +43,7 @@ const SYSTEM_PROPOSAL_WRITER = `You are an expert Upwork proposal writer AI assi
 You write compelling, professional, and personalised cover letters that win contracts.
 Your proposals are concise, demonstrate understanding of the client's problem, and highlight relevant experience.
 Never use generic filler. Every sentence should add value.
+When suggesting GitHub repositories: you MUST choose based on the specific job's required skills, tech stack, and description. Different jobs (e.g. React vs Python, frontend vs backend, mobile vs web) must receive different repo suggestions that match that job. Do not suggest the same repos for every job — only include repos whose language, topics, or description align with this job's requirements. If none match, return an empty relevantRepos array.
 Always respond in valid JSON matching the exact schema requested.`;
 
 const SYSTEM_CLIENT_ANALYST = `You are an expert Upwork client analyst AI assistant called "Bid Buddy".
@@ -151,15 +152,32 @@ export function buildProposalPrompt(
     ? `\n## Prior AI Analysis\n- Fit Score: ${input.analysisContext.fitScore}%\n- Strengths: ${input.analysisContext.strengths.join(", ")}\n- Matched Skills: ${input.analysisContext.matchedSkills.join(", ")}\n- Suggested Rate: $${input.analysisContext.suggestedRate ?? "N/A"}`
     : "";
 
-  // Build GitHub repos context
+  // Build GitHub repos context — emphasize matching to THIS job's skills and type
+  const skillsList = input.skillsRequired.join(", ") || "None listed";
+
+  const portfolioNote =
+    input.portfolioWebsites.length > 0
+      ? `\n## Portfolio Websites (include in footer)
+The freelancer has these live websites. You MUST end the cover letter with a short footer line that includes these links so the client can visit them. Use the label if provided, otherwise the URL. Format naturally, e.g. "Portfolio: [My App](https://myapp.com) | [Demo](https://demo.example.com)" or "You can see my work at: [URL1], [URL2]". Keep the footer to one line and place it at the very end after your closing.\n\n${input.portfolioWebsites
+  .map(
+    (w, i) =>
+      `${i + 1}. ${w.label ? `**${w.label}**: ${w.url}` : w.url}`
+  )
+  .join("\n")}`
+      : "";
+
   const githubReposNote =
     input.githubRepos.length > 0
-      ? `\n## Freelancer GitHub Repositories\nThe freelancer has the following public GitHub repos that may be relevant to this job. Review them and pick up to 3 that are most relevant based on language, topics, and description matching the job requirements.\n\n${input.githubRepos
-          .map(
-            (r, i) =>
-              `${i + 1}. **${r.name}** (${r.fullName})\n   - URL: ${r.url}\n   - Language: ${r.language ?? "N/A"}\n   - Topics: ${r.topics.join(", ") || "None"}\n   - Stars: ${r.stars}\n   - Description: ${r.description ?? "No description"}`
-          )
-          .join("\n")}`
+      ? `\n## Freelancer GitHub Repositories (choose only repos that match THIS job)
+**This job requires:** ${skillsList}. **Job type:** ${input.jobType}.
+Select up to 3 repos whose language, topics, or description align with these requirements. Do NOT suggest the same set of repos for every job — match each job's stack (e.g. React job → React/JS repos; Python job → Python repos; mobile → mobile repos). If no repos fit this job, return an empty relevantRepos array.
+
+${input.githubRepos
+  .map(
+    (r, i) =>
+      `${i + 1}. **${r.name}** (${r.fullName})\n   - URL: ${r.url}\n   - Language: ${r.language ?? "N/A"}\n   - Topics: ${r.topics.join(", ") || "None"}\n   - Stars: ${r.stars}\n   - Description: ${r.description ?? "No description"}`
+  )
+  .join("\n")}`
       : "";
 
   const userPrompt = `Generate a winning Upwork proposal for the following job.
@@ -178,6 +196,7 @@ ${analysisNote}
 ## Freelancer Skills
 - **All Skills:** ${freelancer.skills.join(", ") || "None provided"}
 - **Primary Skills:** ${freelancer.primarySkills.join(", ") || "None provided"}
+${portfolioNote}
 ${githubReposNote}
 
 ## Instructions
@@ -190,12 +209,13 @@ Write a compelling, personalised cover letter. It should:
 6. Sound natural and human, not template-like
 7. Never use phrases like "I am writing to express my interest"
 8. IMPORTANT: When mentioning any GitHub repo in the cover letter, you MUST include the full URL so the client can click and explore it. Format it naturally, e.g. "You can see my work in my Slack clone project (https://github.com/user/slack-clone-client) which demonstrates..."
+9. If portfolio websites are provided above, end the cover letter with a one-line footer that includes those links (e.g. "Portfolio: [Site 1](url) | [Site 2](url)"). Place this footer at the very end after your sign-off.
 
-Also select up to 3 GitHub repositories from the provided list that are most relevant to this job. For each:
-- Provide a "relevanceReason": a one-liner on why this repo matters for this specific job.
-- Provide a "briefSummary": a 2-3 sentence description of what the repo actually does and what technologies/patterns it demonstrates. Infer functionality from the repo name, description, language, and topics. Be specific — describe the features, architecture patterns, and tech stack used.
+Repo selection (important): From the list above, select only repos that match THIS job's required skills and tech stack. Different jobs must get different suggestions (e.g. a Node.js job gets Node/JS repos; a React job gets React/frontend repos). For each selected repo:
+- "relevanceReason": one sentence on why this repo is relevant to this specific job (mention the job's required skills or stack).
+- "briefSummary": 2-3 sentences on what the repo does and what technologies/patterns it demonstrates.
 
-If no repos are relevant or none were provided, return an empty array.
+If no repos match this job's requirements, or none were provided, return an empty relevantRepos array. Do not default to the same repos for every job.
 
 Respond with a JSON object using this exact schema:
 {

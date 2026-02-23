@@ -115,6 +115,8 @@ export interface ProposalGenerationInput {
   } | null;
   /** GitHub repos available for showcasing to the client. */
   githubRepos: GitHubRepoContext[];
+  /** Live portfolio websites to include in the proposal footer. */
+  portfolioWebsites: { url: string; label?: string | null }[];
 }
 
 /** A matched GitHub repo recommended by AI to showcase in the proposal. */

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ProfileOptimizerCard } from "@/components/modules/settings/profile-optimizer-card";
 import { StyleTrainerCard } from "@/components/modules/settings/style-trainer-card";
 import { AlertPreferencesCard } from "@/components/modules/settings/alert-preferences-card";
+import { PortfolioWebsitesCard } from "@/components/modules/settings/portfolio-websites-card";
 
 export const metadata: Metadata = createPageMetadata(
   "Settings",
@@ -33,6 +34,9 @@ export default function SettingsPage() {
           <StyleTrainerCard />
         </div>
         <div className="animate-fade-in-up stagger-4">
+          <PortfolioWebsitesCard />
+        </div>
+        <div className="animate-fade-in-up stagger-5">
           <Card className="rounded-2xl border transition-all hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5">
             <CardHeader>
               <CardTitle className="text-base">GitHub Integration</CardTitle>
@@ -45,7 +49,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
-        <div className="animate-fade-in-up stagger-5">
+        <div className="animate-fade-in-up stagger-6">
           <Card className="rounded-2xl border transition-all hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5">
             <CardHeader>
               <CardTitle className="text-base">AI Configuration</CardTitle>

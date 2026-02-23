@@ -15,6 +15,7 @@ import { githubRouter } from "./routers/github-router";
 import { scopeRouter } from "./routers/scope-router";
 import { pipelineRouter } from "./routers/pipeline-router";
 import { notificationRouter } from "./routers/notification-router";
+import { portfolioRouter } from "./routers/portfolio-router";
 
 export const appRouter = createRouter({
   auth: authRouter,
@@ -29,6 +30,7 @@ export const appRouter = createRouter({
   scope: scopeRouter,
   pipeline: pipelineRouter,
   notification: notificationRouter,
+  portfolio: portfolioRouter,
 });
 
 export type AppRouter = typeof appRouter;

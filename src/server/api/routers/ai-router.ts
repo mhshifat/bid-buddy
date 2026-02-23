@@ -339,7 +339,7 @@ export const aiRouter = createRouter({
         pushedAt?: string;
       };
 
-      const githubRepos: import("@/server/ai/types").GitHubRepoContext[] =
+      let githubRepos: import("@/server/ai/types").GitHubRepoContext[] =
         Array.isArray(githubProfile?.top_repos)
           ? (githubProfile.top_repos as StoredRepoShape[]).map((r) => ({
               name: r.name,
@@ -351,6 +351,26 @@ export const aiRouter = createRouter({
               stars: r.stars ?? 0,
             }))
           : [];
+
+      // Shuffle so the model doesn't always bias toward the first N repos in the list
+      if (githubRepos.length > 1) {
+        githubRepos = [...githubRepos];
+        for (let i = githubRepos.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [githubRepos[i], githubRepos[j]] = [githubRepos[j]!, githubRepos[i]!];
+        }
+      }
+
+      // Portfolio websites to include in proposal footer
+      const portfolioRows = await ctx.prisma.portfolioWebsite.findMany({
+        where: { tenant_id: tenantId },
+        orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
+        select: { url: true, label: true },
+      });
+      const portfolioWebsites = portfolioRows.map((r) => ({
+        url: r.url,
+        label: r.label ?? undefined,
+      }));
 
       const aiService = getAiService();
 
@@ -370,6 +390,7 @@ export const aiRouter = createRouter({
           estimatedDuration: job.estimated_duration,
           analysisContext,
           githubRepos,
+          portfolioWebsites,
         },
         job.id,
         tenantId,

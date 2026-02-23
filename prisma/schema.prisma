@@ -37,8 +37,28 @@ model Tenant {
   job_activities   JobActivity[]
   alert_preferences AlertPreference[]
   notification_logs NotificationLog[]
+  portfolio_websites PortfolioWebsite[]
 
   @@map("tenants")
+}
+
+// ============================================================================
+// Portfolio Websites (for proposal footer)
+// ============================================================================
+
+model PortfolioWebsite {
+  id         String   @id @default(cuid())
+  tenant_id  String
+  url        String
+  label      String?  // Optional display name (e.g. "My SaaS App")
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@map("portfolio_websites")
 }
 
 // ============================================================================
