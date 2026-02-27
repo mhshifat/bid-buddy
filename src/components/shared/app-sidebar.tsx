@@ -137,7 +137,7 @@ export function AppSidebar() {
       <SidebarHeader className="px-4 py-4">
         <div className="flex items-center justify-between">
           <Link
-            href="/dashboard"
+            href="/"
             className="group flex items-center gap-2.5 transition-opacity hover:opacity-80"
           >
             <BrandLogo />

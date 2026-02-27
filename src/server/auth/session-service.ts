@@ -13,6 +13,9 @@ import type { SessionWithUser, AuthUser, RequestMetadata } from "./types";
 /** Sessions are auto-extended when they are within this many days of expiry. */
 const SESSION_REFRESH_THRESHOLD_DAYS = 7;
 
+/** Max lifetime from first login; sessions are not extended beyond this (security). */
+const SESSION_MAX_LIFETIME_DAYS = 3;
+
 /**
  * Generates a cryptographically secure random session token.
  */
@@ -48,59 +51,83 @@ export class SessionService {
   /**
    * Validates a session token and returns the session + user if valid.
    * Returns null for expired, revoked, or non-existent sessions.
+   * When the database is unavailable, returns null so the app can redirect to
+   * login instead of crashing (graceful degradation).
    * Automatically extends sessions nearing expiry.
    */
   async validateSession(token: string): Promise<SessionWithUser | null> {
-    const dbSession = await sessionRepository.findByToken(token);
+    let dbSession;
+    try {
+      dbSession = await sessionRepository.findByToken(token);
+    } catch (error) {
+      logger.warn("Session validation failed (e.g. database unavailable)", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
 
     if (!dbSession) {
       return null;
     }
 
-    // Reject expired sessions and clean up
-    if (dbSession.expires_at < new Date()) {
-      await sessionRepository.delete(dbSession.id);
-      logger.debug("Expired session cleaned up", { sessionId: dbSession.id });
-      return null;
-    }
+    try {
+      // Reject expired sessions and clean up
+      if (dbSession.expires_at < new Date()) {
+        await sessionRepository.delete(dbSession.id);
+        logger.debug("Expired session cleaned up", { sessionId: dbSession.id });
+        return null;
+      }
 
-    // Reject inactive users
-    if (!dbSession.user.is_active) {
-      await sessionRepository.delete(dbSession.id);
-      logger.warn("Session revoked for inactive user", {
-        userId: dbSession.user_id,
+      // Reject inactive users
+      if (!dbSession.user.is_active) {
+        await sessionRepository.delete(dbSession.id);
+        logger.warn("Session revoked for inactive user", {
+          userId: dbSession.user_id,
+        });
+        return null;
+      }
+
+      // Auto-extend session only if within refresh threshold and under max lifetime
+      const daysUntilExpiry =
+        (dbSession.expires_at.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+      const sessionAgeDays =
+        (Date.now() - dbSession.created_at.getTime()) / (1000 * 60 * 60 * 24);
+
+      if (
+        daysUntilExpiry < SESSION_REFRESH_THRESHOLD_DAYS &&
+        sessionAgeDays < SESSION_MAX_LIFETIME_DAYS
+      ) {
+        const maxExpiresAt = new Date(dbSession.created_at);
+        maxExpiresAt.setDate(maxExpiresAt.getDate() + SESSION_MAX_LIFETIME_DAYS);
+        await sessionRepository.extendSession(dbSession.id, maxExpiresAt);
+        logger.debug("Session auto-extended", { sessionId: dbSession.id });
+      }
+
+      const user: AuthUser = {
+        id: dbSession.user.id,
+        tenantId: dbSession.user.tenant_id,
+        email: dbSession.user.email,
+        name: dbSession.user.name,
+        avatarUrl: dbSession.user.avatar_url,
+        role: dbSession.user.role,
+        isActive: dbSession.user.is_active,
+      };
+
+      return {
+        session: {
+          id: dbSession.id,
+          userId: dbSession.user_id,
+          token: dbSession.token,
+          expiresAt: dbSession.expires_at,
+        },
+        user,
+      };
+    } catch (error) {
+      logger.warn("Session validation failed after fetch (e.g. database unavailable)", {
+        error: error instanceof Error ? error.message : String(error),
       });
       return null;
     }
-
-    // Auto-extend session if within the refresh threshold
-    const daysUntilExpiry =
-      (dbSession.expires_at.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-
-    if (daysUntilExpiry < SESSION_REFRESH_THRESHOLD_DAYS) {
-      await sessionRepository.extendSession(dbSession.id);
-      logger.debug("Session auto-extended", { sessionId: dbSession.id });
-    }
-
-    const user: AuthUser = {
-      id: dbSession.user.id,
-      tenantId: dbSession.user.tenant_id,
-      email: dbSession.user.email,
-      name: dbSession.user.name,
-      avatarUrl: dbSession.user.avatar_url,
-      role: dbSession.user.role,
-      isActive: dbSession.user.is_active,
-    };
-
-    return {
-      session: {
-        id: dbSession.id,
-        userId: dbSession.user_id,
-        token: dbSession.token,
-        expiresAt: dbSession.expires_at,
-      },
-      user,
-    };
   }
 
   /**

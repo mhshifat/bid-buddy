@@ -9,7 +9,7 @@ import { prisma } from "@/server/db/prisma";
 import { DatabaseError } from "@/server/lib/errors";
 import { logger } from "@/server/lib/logger";
 
-const SESSION_DURATION_DAYS = 30;
+const SESSION_DURATION_DAYS = 3;
 
 interface CreateSessionInput {
   userId: string;
@@ -128,15 +128,18 @@ export class SessionRepository {
 
   /**
    * Extends a session's expiry by SESSION_DURATION_DAYS from now.
+   * If maxExpiresAt is provided, expiry is capped to that date (e.g. for 3-day max lifetime).
    */
-  async extendSession(id: string) {
+  async extendSession(id: string, maxExpiresAt?: Date) {
     try {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + SESSION_DURATION_DAYS);
+      const capped =
+        maxExpiresAt && expiresAt > maxExpiresAt ? maxExpiresAt : expiresAt;
 
       return await prisma.session.update({
         where: { id },
-        data: { expires_at: expiresAt },
+        data: { expires_at: capped },
       });
     } catch (error) {
       throw new DatabaseError(

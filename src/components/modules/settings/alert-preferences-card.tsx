@@ -437,13 +437,14 @@ export function AlertPreferencesCard() {
                   </div>
                   <p className="text-[11px] text-blue-600 dark:text-blue-400">
                     The Bid Buddy browser extension syncs these settings
-                    automatically every 5 minutes. After saving, the extension
-                    will pick up your changes on the next sync cycle.
+                    automatically every 5 minutes.{" "}
+                    <strong>After saving, open the extension popup and click Sync to see changes immediately</strong>
+                    {" "}(or wait up to 5 minutes).
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     Make sure the extension is installed and the web app is
-                    running at{" "}
-                    <code className="text-[10px]">localhost:3000</code>.
+                    running (e.g. <code className="text-[10px]">localhost:3000</code>).
+                    The extension must use the same app URL you are logged in to.
                   </p>
                 </div>
               </div>

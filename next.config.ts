@@ -8,7 +8,11 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Enable CORS for browser extension communication
+  // CORS for browser extension and web.
+  // Note: Extension sends credentials: "include" for session auth. To allow
+  // cookies in cross-origin extension requests, use middleware to set
+  // Access-Control-Allow-Origin to the extension origin and
+  // Access-Control-Allow-Credentials: true (cannot use * with credentials).
   async headers() {
     return [
       {
