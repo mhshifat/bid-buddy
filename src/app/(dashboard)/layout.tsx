@@ -7,6 +7,7 @@
  *   - Sidebar + TopBar chrome
  */
 
+import { redirect } from "next/navigation";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/shared/app-sidebar";
@@ -22,12 +23,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Pre-fetch session on the server so the AuthProvider has it immediately
+  // Validate session server-side – redirect to login immediately if invalid.
   const sessionData = await getServerSession();
 
-  const initialUser: AuthUser | null = sessionData
-    ? sessionData.user
-    : null;
+  if (!sessionData) {
+    redirect("/login");
+  }
+
+  const initialUser: AuthUser = sessionData.user;
 
   return (
     <AuthProvider initialUser={initialUser}>
