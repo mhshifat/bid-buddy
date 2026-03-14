@@ -34,12 +34,11 @@ export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
   const hasSession = !!request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
-  // If user is on auth-only page and already has a session, send to dashboard
-  if (AUTH_ONLY_ROUTES.some((r) => pathname === r) && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // If accessing a protected route without a session cookie, send to login
+  // If accessing a protected route without any session cookie, send to login.
+  // Note: cookie existence is a lightweight check only. Full token validation
+  // happens in the dashboard layout server component (getServerSession).
+  // We intentionally do NOT redirect away from /login when a cookie exists,
+  // because the cookie may be stale — the login page handles that itself.
   const isProtected = PROTECTED_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix)
   );
