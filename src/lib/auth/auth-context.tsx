@@ -18,7 +18,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 // ---------------------------------------------------------------------------
 // Types (client-safe – no Prisma imports)
@@ -67,6 +67,16 @@ export function AuthProvider({
   const [user, setUser] = useState<AuthUser | null>(initialUser);
   const [isLoading, setIsLoading] = useState(!initialUser);
   const router = useRouter();
+  const pathname = usePathname();
+
+  const redirectToLogin = useCallback(() => {
+    if (pathname === "/login") return;
+    const loginUrl = new URL("/login", window.location.origin);
+    if (pathname) {
+      loginUrl.searchParams.set("callbackUrl", pathname);
+    }
+    router.replace(loginUrl.pathname + loginUrl.search);
+  }, [router, pathname]);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -82,16 +92,19 @@ export function AuthProvider({
           setUser(json.data.user);
         } else {
           setUser(null);
+          redirectToLogin();
         }
       } else {
         setUser(null);
+        redirectToLogin();
       }
     } catch {
       setUser(null);
+      redirectToLogin();
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [redirectToLogin]);
 
   const logout = useCallback(async () => {
     try {
